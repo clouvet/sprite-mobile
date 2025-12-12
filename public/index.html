@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a1a">
+  <title>Claude Code</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #1a1a1a;
+      --bg-secondary: #252525;
+      --bg-tertiary: #2d2d2d;
+      --text: #e5e5e5;
+      --text-muted: #888;
+      --accent: #d4a574;
+      --user-bg: #3b3b3b;
+      --assistant-bg: #252525;
+      --border: #333;
+      --input-bg: #2d2d2d;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: 100dvh;
+      padding-top: var(--safe-top);
+    }
+
+    /* Header */
+    header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    #status {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #666;
+    }
+
+    #status.connected::before {
+      background: #4ade80;
+    }
+
+    #status.error::before {
+      background: #f87171;
+    }
+
+    /* Messages area */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .message {
+      margin-bottom: 16px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-header {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .message-content {
+      padding: 12px 14px;
+      border-radius: 16px;
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .message.user .message-content {
+      background: var(--user-bg);
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .message-content {
+      background: var(--assistant-bg);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.system .message-content {
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .message.tool .message-content {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-family: "SF Mono", Monaco, monospace;
+    }
+
+    .message.tool .tool-name {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Markdown content */
+    .message-content p {
+      margin-bottom: 8px;
+    }
+
+    .message-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    .message-content code {
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      font-size: 14px;
+      background: rgba(0,0,0,0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .message-content pre {
+      margin: 8px 0;
+      padding: 12px;
+      background: #0d0d0d;
+      border-radius: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .message-content pre code {
+      background: none;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .message-content ul, .message-content ol {
+      margin: 8px 0;
+      padding-left: 24px;
+    }
+
+    .message-content li {
+      margin-bottom: 4px;
+    }
+
+    .message-content a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .message-content strong {
+      font-weight: 600;
+    }
+
+    /* Streaming indicator */
+    .streaming::after {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--accent);
+      margin-left: 4px;
+      animation: blink 1s infinite;
+      vertical-align: text-bottom;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* Input area */
+    #input-area {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      padding-bottom: calc(12px + var(--safe-bottom));
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+    }
+
+    #input-wrapper {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    #input {
+      flex: 1;
+      min-height: 44px;
+      max-height: 120px;
+      padding: 10px 14px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      color: var(--text);
+      font-size: 16px;
+      font-family: inherit;
+      line-height: 1.4;
+      resize: none;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    #input:focus {
+      border-color: var(--accent);
+    }
+
+    #input::placeholder {
+      color: var(--text-muted);
+    }
+
+    #send {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      color: #1a1a1a;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #send:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #send:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    /* Tool use indicator */
+    .tool-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .tool-indicator .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Claude Code</h1>
+      <div id="status">Connecting...</div>
+    </header>
+
+    <div id="messages"></div>
+
+    <div id="input-area">
+      <div id="input-wrapper">
+        <textarea
+          id="input"
+          placeholder="Message Claude..."
+          rows="1"
+          enterkeyhint="send"
+        ></textarea>
+        <button id="send" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const statusEl = document.getElementById('status');
+
+    let ws;
+    let currentAssistantMessage = null;
+    let assistantContent = '';
+
+    // Configure marked
+    marked.setOptions({
+      highlight: (code, lang) => {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+      breaks: true,
+    });
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+      ws.onopen = () => {
+        statusEl.textContent = 'Connected';
+        statusEl.className = 'connected';
+        sendBtn.disabled = false;
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = 'Disconnected';
+        statusEl.className = 'error';
+        sendBtn.disabled = true;
+        // Reconnect after 2 seconds
+        setTimeout(connect, 2000);
+      };
+
+      ws.onerror = () => {
+        statusEl.textContent = 'Error';
+        statusEl.className = 'error';
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleMessage(msg);
+        } catch (e) {
+          console.error('Failed to parse message:', e);
+        }
+      };
+    }
+
+    function handleMessage(msg) {
+      // Handle different message types from Claude Code stream-json format
+      switch (msg.type) {
+        case 'system':
+          addSystemMessage(msg.message);
+          break;
+
+        case 'assistant':
+          // Start or continue assistant message
+          if (msg.message?.content) {
+            handleAssistantContent(msg.message.content);
+          }
+          if (msg.stop_reason) {
+            finalizeAssistantMessage();
+          }
+          break;
+
+        case 'content_block_start':
+          if (msg.content_block?.type === 'text') {
+            startAssistantMessage();
+          } else if (msg.content_block?.type === 'tool_use') {
+            addToolIndicator(msg.content_block.name);
+          }
+          break;
+
+        case 'content_block_delta':
+          if (msg.delta?.type === 'text_delta') {
+            appendAssistantText(msg.delta.text);
+          }
+          break;
+
+        case 'content_block_stop':
+          // Block finished
+          break;
+
+        case 'message_stop':
+          finalizeAssistantMessage();
+          break;
+
+        case 'result':
+          // Tool result or final result
+          if (msg.result) {
+            addToolResult(msg.result);
+          }
+          break;
+
+        case 'stderr':
+          console.log('Claude stderr:', msg.message);
+          break;
+
+        default:
+          // Handle other message types
+          if (msg.content) {
+            handleAssistantContent(msg.content);
+          }
+      }
+
+      scrollToBottom();
+    }
+
+    function handleAssistantContent(content) {
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'text') {
+            startAssistantMessage();
+            appendAssistantText(block.text);
+          } else if (block.type === 'tool_use') {
+            addToolIndicator(block.name);
+          }
+        }
+      } else if (typeof content === 'string') {
+        startAssistantMessage();
+        appendAssistantText(content);
+      }
+    }
+
+    function startAssistantMessage() {
+      if (!currentAssistantMessage) {
+        currentAssistantMessage = document.createElement('div');
+        currentAssistantMessage.className = 'message assistant';
+        currentAssistantMessage.innerHTML = `
+          <div class="message-header">Claude</div>
+          <div class="message-content streaming"></div>
+        `;
+        messagesEl.appendChild(currentAssistantMessage);
+        assistantContent = '';
+      }
+    }
+
+    function appendAssistantText(text) {
+      if (!currentAssistantMessage) {
+        startAssistantMessage();
+      }
+      assistantContent += text;
+      const contentEl = currentAssistantMessage.querySelector('.message-content');
+      contentEl.innerHTML = marked.parse(assistantContent);
+      contentEl.classList.add('streaming');
+      scrollToBottom();
+    }
+
+    function finalizeAssistantMessage() {
+      if (currentAssistantMessage) {
+        const contentEl = currentAssistantMessage.querySelector('.message-content');
+        contentEl.classList.remove('streaming');
+        // Re-highlight code blocks
+        contentEl.querySelectorAll('pre code').forEach((block) => {
+          hljs.highlightElement(block);
+        });
+        currentAssistantMessage = null;
+        assistantContent = '';
+      }
+    }
+
+    function addUserMessage(text) {
+      const msg = document.createElement('div');
+      msg.className = 'message user';
+      msg.innerHTML = `
+        <div class="message-header">You</div>
+        <div class="message-content">${escapeHtml(text)}</div>
+      `;
+      messagesEl.appendChild(msg);
+      scrollToBottom();
+    }
+
+    function addSystemMessage(text) {
+      const msg = document.createElement('div');
+      msg.className = 'message system';
+      msg.innerHTML = `<div class="message-content">${escapeHtml(text)}</div>`;
+      messagesEl.appendChild(msg);
+      scrollToBottom();
+    }
+
+    function addToolIndicator(toolName) {
+      finalizeAssistantMessage();
+      const indicator = document.createElement('div');
+      indicator.className = 'tool-indicator';
+      indicator.innerHTML = `<div class="spinner"></div><span>Using <strong>${escapeHtml(toolName)}</strong>...</span>`;
+      messagesEl.appendChild(indicator);
+      scrollToBottom();
+    }
+
+    function addToolResult(result) {
+      // Remove tool indicator
+      const indicators = messagesEl.querySelectorAll('.tool-indicator');
+      if (indicators.length > 0) {
+        indicators[indicators.length - 1].remove();
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function scrollToBottom() {
+      requestAnimationFrame(() => {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
+    }
+
+    function send() {
+      const text = inputEl.value.trim();
+      if (!text || ws.readyState !== WebSocket.OPEN) return;
+
+      addUserMessage(text);
+      ws.send(JSON.stringify({ type: 'user', content: text }));
+
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      inputEl.focus();
+    }
+
+    // Auto-resize textarea
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+    });
+
+    // Send on Enter (without Shift)
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+
+    sendBtn.addEventListener('click', send);
+
+    // Prevent zoom on double-tap
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+    let lastTouchEnd = 0;
+
+    // Connect on load
+    connect();
+  </script>
+</body>
+</html>
