@@ -696,6 +696,69 @@
       color: white;
     }
 
+    .wake-current-sprite {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .wake-url-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    #wake-url-input {
+      flex: 1;
+      padding: 10px 12px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    #save-wake-url-btn {
+      width: 40px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #save-wake-url-btn:active {
+      background: var(--accent);
+      color: #1a1a1a;
+    }
+
+    #wake-current-btn {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    #wake-current-btn:active {
+      background: var(--accent);
+      color: #1a1a1a;
+      border-color: var(--accent);
+    }
+
+    #wake-current-btn.waking {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
     .sprite-current-badge {
       font-size: 11px;
       color: var(--accent);
@@ -885,6 +948,13 @@
         <button class="modal-close" id="close-sprites-modal">×</button>
       </div>
       <div class="modal-body">
+        <div class="wake-current-sprite">
+          <div class="wake-url-row">
+            <input type="text" id="wake-url-input" placeholder="Public URL (e.g., https://name.sprites.app)">
+            <button id="save-wake-url-btn" title="Save">&#10003;</button>
+          </div>
+          <button id="wake-current-btn">Wake Current Sprite</button>
+        </div>
         <div class="sprites-list" id="sprites-list"></div>
         <div class="add-sprite-form">
           <input type="text" id="sprite-name-input" placeholder="Sprite name (e.g., Work Sprite)">
@@ -925,6 +995,9 @@
     const spriteNameInput = document.getElementById('sprite-name-input');
     const spriteAddressInput = document.getElementById('sprite-address-input');
     const addSpriteBtn = document.getElementById('add-sprite-btn');
+    const wakeCurrentBtn = document.getElementById('wake-current-btn');
+    const wakeUrlInput = document.getElementById('wake-url-input');
+    const saveWakeUrlBtn = document.getElementById('save-wake-url-btn');
     const pullIndicator = document.getElementById('pull-indicator');
 
     // State
@@ -1500,18 +1573,74 @@
       loadSprites();
     }
 
+    function loadWakeUrl() {
+      const saved = localStorage.getItem('wakeUrl');
+      if (saved) {
+        wakeUrlInput.value = saved;
+      }
+    }
+
+    function saveWakeUrl() {
+      const url = wakeUrlInput.value.trim();
+      if (url) {
+        localStorage.setItem('wakeUrl', url);
+        saveWakeUrlBtn.textContent = '✓';
+        setTimeout(() => {
+          saveWakeUrlBtn.innerHTML = '&#10003;';
+        }, 1000);
+      }
+    }
+
+    async function wakeCurrentSprite() {
+      const baseUrl = wakeUrlInput.value.trim();
+      if (!baseUrl) {
+        alert('Please enter the public URL first');
+        wakeUrlInput.focus();
+        return;
+      }
+
+      const originalText = wakeCurrentBtn.textContent;
+      wakeCurrentBtn.classList.add('waking');
+      wakeCurrentBtn.textContent = 'Waking...';
+
+      try {
+        // Hit the public wake-up endpoint
+        // Remove trailing slash and ensure we hit the root
+        const url = baseUrl.replace(/\/$/, '') + '/';
+        await fetch(url, { mode: 'no-cors' });
+        // Brief visual feedback
+        wakeCurrentBtn.textContent = 'Awake!';
+        setTimeout(() => {
+          wakeCurrentBtn.textContent = originalText;
+          wakeCurrentBtn.classList.remove('waking');
+        }, 1500);
+      } catch (err) {
+        console.log('Wake request sent (may fail due to CORS, but sprite should wake)');
+        wakeCurrentBtn.textContent = 'Sent!';
+        setTimeout(() => {
+          wakeCurrentBtn.textContent = originalText;
+          wakeCurrentBtn.classList.remove('waking');
+        }, 1500);
+      }
+    }
+
     function navigateToSprite(address, port) {
       const protocol = location.protocol;
       const url = `${protocol}//${address}:${port}`;
       window.location.href = url;
     }
 
-    // Make deleteSprite global for onclick
+    // Make functions global for onclick
     window.deleteSprite = deleteSprite;
 
     // Sprites modal event listeners
     settingsBtn.addEventListener('click', openSpritesModal);
     closeSpritesModal.addEventListener('click', closeSpritesModalFn);
+    wakeCurrentBtn.addEventListener('click', wakeCurrentSprite);
+    saveWakeUrlBtn.addEventListener('click', saveWakeUrl);
+    wakeUrlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveWakeUrl();
+    });
     spritesModal.addEventListener('click', (e) => {
       if (e.target === spritesModal) closeSpritesModalFn();
     });
@@ -1602,6 +1731,7 @@
     }, { passive: true });
 
     // Init
+    loadWakeUrl();
     loadSessions().then(() => {
       // Restore last session if saved (e.g., after pull-to-refresh)
       const lastSessionId = localStorage.getItem('lastSessionId');
