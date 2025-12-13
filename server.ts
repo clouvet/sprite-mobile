@@ -8,10 +8,12 @@ const DATA_DIR = join(import.meta.dir, "data");
 const SESSIONS_FILE = join(DATA_DIR, "sessions.json");
 const SPRITES_FILE = join(DATA_DIR, "sprites.json");
 const MESSAGES_DIR = join(DATA_DIR, "messages");
+const UPLOADS_DIR = join(DATA_DIR, "uploads");
 
 // Ensure directories exist
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 if (!existsSync(MESSAGES_DIR)) mkdirSync(MESSAGES_DIR, { recursive: true });
+if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Types
 interface ChatSession {
@@ -29,6 +31,11 @@ interface StoredMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  image?: {
+    id: string;
+    filename: string;
+    mediaType: string;
+  };
 }
 
 interface SpriteProfile {
@@ -383,6 +390,81 @@ function handleApi(req: Request, url: URL): Response | null {
     return new Response(null, { status: 204 });
   }
 
+  // POST /api/upload?session={sessionId}
+  if (req.method === "POST" && path === "/api/upload") {
+    return (async () => {
+      const sessionId = url.searchParams.get("session");
+      if (!sessionId) {
+        return new Response("Session ID required", { status: 400 });
+      }
+
+      try {
+        const formData = await req.formData();
+        const file = formData.get("file") as File | null;
+
+        if (!file) {
+          return new Response("No file provided", { status: 400 });
+        }
+
+        // Validate it's an image
+        if (!file.type.startsWith("image/")) {
+          return new Response("Only images are allowed", { status: 400 });
+        }
+
+        // Create session upload directory
+        const sessionUploadsDir = join(UPLOADS_DIR, sessionId);
+        if (!existsSync(sessionUploadsDir)) {
+          mkdirSync(sessionUploadsDir, { recursive: true });
+        }
+
+        // Generate unique filename
+        const id = generateId();
+        const ext = file.name.split(".").pop() || "png";
+        const filename = `${id}.${ext}`;
+        const filePath = join(sessionUploadsDir, filename);
+
+        // Save file
+        const buffer = await file.arrayBuffer();
+        writeFileSync(filePath, Buffer.from(buffer));
+
+        return Response.json({
+          id,
+          filename,
+          mediaType: file.type,
+          url: `/api/uploads/${sessionId}/${filename}`,
+        });
+      } catch (err) {
+        console.error("Upload error:", err);
+        return new Response("Upload failed", { status: 500 });
+      }
+    })();
+  }
+
+  // GET /api/uploads/:sessionId/:filename
+  if (req.method === "GET" && path.match(/^\/api\/uploads\/[^/]+\/[^/]+$/)) {
+    const parts = path.split("/");
+    const sessionId = parts[3];
+    const filename = parts[4];
+    const filePath = join(UPLOADS_DIR, sessionId, filename);
+
+    try {
+      if (!existsSync(filePath)) {
+        return new Response("Not found", { status: 404 });
+      }
+      const content = readFileSync(filePath);
+      const contentType = filename.endsWith(".png") ? "image/png"
+        : filename.endsWith(".jpg") || filename.endsWith(".jpeg") ? "image/jpeg"
+        : filename.endsWith(".gif") ? "image/gif"
+        : filename.endsWith(".webp") ? "image/webp"
+        : "application/octet-stream";
+      return new Response(content, {
+        headers: { "Content-Type": contentType },
+      });
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  }
+
   return null;
 }
 
@@ -486,31 +568,71 @@ const server = Bun.serve({
       try {
         const data = JSON.parse(message.toString());
 
-        if (data.type === "user" && data.content) {
+        if (data.type === "user" && (data.content || data.imageId)) {
           // Check if this is the first message - auto-rename the session
           const existingMessages = loadMessages(sessionId);
           const session = getSession(sessionId);
           if (existingMessages.length === 0 && session?.name.match(/^Chat \d+$/)) {
             // Fire off title generation in background (don't await)
-            generateChatName(data.content, sessionId, bg);
+            generateChatName(data.content || "Image shared", sessionId, bg);
+          }
+
+          // Build message content for Claude
+          let claudeContent: any = data.content || "";
+          let imageInfo: StoredMessage["image"] = undefined;
+
+          // Handle image if present
+          if (data.imageId && data.imageFilename && data.imageMediaType) {
+            const imagePath = join(UPLOADS_DIR, sessionId, data.imageFilename);
+            if (existsSync(imagePath)) {
+              const imageBuffer = readFileSync(imagePath);
+              const base64Data = imageBuffer.toString("base64");
+
+              // Build content array for Claude with image
+              claudeContent = [
+                {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: data.imageMediaType,
+                    data: base64Data,
+                  },
+                },
+              ];
+
+              // Add text if provided
+              if (data.content) {
+                claudeContent.push({
+                  type: "text",
+                  text: data.content,
+                });
+              }
+
+              imageInfo = {
+                id: data.imageId,
+                filename: data.imageFilename,
+                mediaType: data.imageMediaType,
+              };
+            }
           }
 
           // Save user message
           saveMessage(sessionId, {
             role: "user",
-            content: data.content,
+            content: data.content || "[Image]",
             timestamp: Date.now(),
+            image: imageInfo,
           });
           updateSession(sessionId, {
             lastMessageAt: Date.now(),
-            lastMessage: "You: " + data.content.slice(0, 50),
+            lastMessage: "You: " + (data.content ? data.content.slice(0, 50) : "[Image]"),
             isProcessing: true,
           });
 
           // Send to Claude
           const claudeMsg = JSON.stringify({
             type: "user",
-            message: { role: "user", content: data.content },
+            message: { role: "user", content: claudeContent },
           }) + "\n";
 
           bg.process.stdin.write(claudeMsg);

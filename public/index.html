@@ -491,6 +491,70 @@
     #send:disabled { opacity: 0.5; cursor: not-allowed; }
     #send:active:not(:disabled) { transform: scale(0.95); }
 
+    /* Attach button */
+    #attach-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #attach-btn:active { background: var(--bg-tertiary); }
+    #attach-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Image preview */
+    #image-preview {
+      display: none;
+      padding: 8px 16px;
+      padding-bottom: 0;
+    }
+    #image-preview.has-image { display: block; }
+    #image-preview-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: var(--bg-tertiary);
+      border-radius: 12px;
+      max-width: 200px;
+    }
+    #image-preview img {
+      width: 48px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    #image-preview-name {
+      font-size: 12px;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100px;
+    }
+    #remove-image {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--bg-secondary);
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+    }
+    #remove-image:active { background: var(--border); }
+
     /* Settings button */
     #settings-btn {
       width: 36px;
@@ -787,7 +851,20 @@
       <div id="messages"></div>
 
       <div id="input-area">
+        <div id="image-preview">
+          <div id="image-preview-inner">
+            <img id="image-preview-img" src="" alt="Preview">
+            <span id="image-preview-name"></span>
+            <button id="remove-image">×</button>
+          </div>
+        </div>
         <div id="input-wrapper">
+          <button id="attach-btn" title="Attach image">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </button>
+          <input type="file" id="file-input" accept="image/*" hidden>
           <textarea id="input" placeholder="Message Claude..." rows="1" enterkeyhint="send"></textarea>
           <button id="send" disabled>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -836,6 +913,12 @@
     const sendBtn = document.getElementById('send');
     const statusEl = document.getElementById('status');
     const settingsBtn = document.getElementById('settings-btn');
+    const attachBtn = document.getElementById('attach-btn');
+    const fileInput = document.getElementById('file-input');
+    const imagePreview = document.getElementById('image-preview');
+    const imagePreviewImg = document.getElementById('image-preview-img');
+    const imagePreviewName = document.getElementById('image-preview-name');
+    const removeImageBtn = document.getElementById('remove-image');
     const spritesModal = document.getElementById('sprites-modal');
     const closeSpritesModal = document.getElementById('close-sprites-modal');
     const spritesList = document.getElementById('sprites-list');
@@ -851,6 +934,7 @@
     let currentAssistantMessage = null;
     let assistantContent = '';
     let sprites = [];
+    let pendingImage = null; // { id, filename, mediaType, url, localUrl }
 
     // Configure marked
     marked.setOptions({
@@ -1019,7 +1103,9 @@
           if (msg.messages && Array.isArray(msg.messages)) {
             for (const m of msg.messages) {
               if (m.role === 'user') {
-                addUserMessage(m.content);
+                // Build image URL if message has an attached image
+                const imageUrl = m.image ? `/api/uploads/${currentSession.id}/${m.image.filename}` : null;
+                addUserMessage(m.content, imageUrl);
               } else if (m.role === 'assistant') {
                 addStoredAssistantMessage(m.content);
               }
@@ -1132,12 +1218,16 @@
       }
     }
 
-    function addUserMessage(text) {
+    function addUserMessage(text, imageUrl = null) {
       const msg = document.createElement('div');
       msg.className = 'message user';
+      let imageHtml = '';
+      if (imageUrl) {
+        imageHtml = `<img src="${imageUrl}" class="message-image" style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-bottom: 8px; display: block;">`;
+      }
       msg.innerHTML = `
         <div class="message-header">You</div>
-        <div class="message-content">${escapeHtml(text)}</div>
+        <div class="message-content">${imageHtml}${text ? escapeHtml(text) : ''}</div>
       `;
       messagesEl.appendChild(msg);
       scrollToBottom();
@@ -1214,15 +1304,77 @@
 
     function send() {
       const text = inputEl.value.trim();
-      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const hasImage = pendingImage !== null;
 
-      addUserMessage(text);
-      ws.send(JSON.stringify({ type: 'user', content: text }));
+      // Need either text or image to send
+      if ((!text && !hasImage) || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+      // Build message payload
+      const payload = { type: 'user', content: text };
+      if (hasImage) {
+        payload.imageId = pendingImage.id;
+        payload.imageFilename = pendingImage.filename;
+        payload.imageMediaType = pendingImage.mediaType;
+      }
+
+      addUserMessage(text, hasImage ? pendingImage.localUrl : null);
+      ws.send(JSON.stringify(payload));
       showThinkingIndicator();
 
+      // Clear input and image
       inputEl.value = '';
       inputEl.style.height = 'auto';
+      clearPendingImage();
       inputEl.focus();
+    }
+
+    function clearPendingImage() {
+      if (pendingImage?.localUrl) {
+        URL.revokeObjectURL(pendingImage.localUrl);
+      }
+      pendingImage = null;
+      imagePreview.classList.remove('has-image');
+      imagePreviewImg.src = '';
+      imagePreviewName.textContent = '';
+    }
+
+    async function uploadImage(file) {
+      if (!currentSession) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch(`/api/upload?session=${currentSession.id}`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+
+        const data = await res.json();
+
+        // Create local URL for preview
+        const localUrl = URL.createObjectURL(file);
+
+        pendingImage = {
+          id: data.id,
+          filename: data.filename,
+          mediaType: data.mediaType,
+          url: data.url,
+          localUrl,
+        };
+
+        // Show preview
+        imagePreviewImg.src = localUrl;
+        imagePreviewName.textContent = file.name;
+        imagePreview.classList.add('has-image');
+      } catch (err) {
+        console.error('Upload failed:', err);
+        alert('Failed to upload image');
+      }
     }
 
     // Event listeners
@@ -1241,6 +1393,17 @@
     sendBtn.addEventListener('click', send);
     newChatBtn.addEventListener('click', () => createSession());
     startChatBtn.addEventListener('click', () => createSession());
+
+    // Image upload handlers
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        uploadImage(file);
+      }
+      fileInput.value = ''; // Reset so same file can be selected again
+    });
+    removeImageBtn.addEventListener('click', clearPendingImage);
 
     // Prevent zoom on double-tap
     let lastTouchEnd = 0;
