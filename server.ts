@@ -2,7 +2,7 @@ import { spawn, type Subprocess } from "bun";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 
-const PORT = 8080;
+const PORT = parseInt(process.env.PORT || "8081");
 const PUBLIC_DIR = join(import.meta.dir, "public");
 const DATA_DIR = join(import.meta.dir, "data");
 const SESSIONS_FILE = join(DATA_DIR, "sessions.json");
