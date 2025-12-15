@@ -931,10 +931,36 @@
     let sessions = [];
     let currentSession = null;
     let ws = null;
+    let keepaliveWs = null;
     let currentAssistantMessage = null;
     let assistantContent = '';
     let sprites = [];
     let pendingImage = null; // { id, filename, mediaType, url, localUrl }
+
+    // Keepalive WebSocket - keeps sprite awake while app is open
+    function connectKeepalive() {
+      if (keepaliveWs && keepaliveWs.readyState === WebSocket.OPEN) return;
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      keepaliveWs = new WebSocket(`${protocol}//${location.host}/ws/keepalive`);
+
+      keepaliveWs.onopen = () => {
+        console.log('Keepalive connected - sprite will stay awake');
+      };
+
+      keepaliveWs.onclose = () => {
+        console.log('Keepalive disconnected');
+        // Reconnect after a short delay
+        setTimeout(connectKeepalive, 2000);
+      };
+
+      keepaliveWs.onerror = () => {
+        console.log('Keepalive error');
+      };
+    }
+
+    // Connect keepalive immediately
+    connectKeepalive();
 
     // Configure marked
     marked.setOptions({

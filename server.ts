@@ -479,6 +479,13 @@ const server = Bun.serve({
       if (response) return response;
     }
 
+    // Keepalive WebSocket - keeps sprite awake while app is open
+    if (url.pathname === "/ws/keepalive") {
+      const upgraded = server.upgrade(req, { data: { type: "keepalive" } });
+      if (!upgraded) return new Response("WebSocket upgrade failed", { status: 400 });
+      return undefined;
+    }
+
     if (url.pathname === "/ws") {
       const sessionId = url.searchParams.get("session");
       if (!sessionId) return new Response("Missing session ID", { status: 400 });
@@ -506,7 +513,15 @@ const server = Bun.serve({
 
   websocket: {
     open(ws) {
-      const { sessionId, cwd, claudeSessionId } = ws.data as {
+      const data = ws.data as { type?: string; sessionId?: string; cwd?: string; claudeSessionId?: string };
+
+      // Handle keepalive connections
+      if (data.type === "keepalive") {
+        console.log("Keepalive connection opened");
+        return;
+      }
+
+      const { sessionId, cwd, claudeSessionId } = data as {
         sessionId: string;
         cwd: string;
         claudeSessionId?: string;
@@ -558,7 +573,14 @@ const server = Bun.serve({
     },
 
     async message(ws, message) {
-      const { sessionId } = ws.data as { sessionId: string };
+      const wsData = ws.data as { type?: string; sessionId?: string };
+
+      // Ignore messages on keepalive connections
+      if (wsData.type === "keepalive") return;
+
+      const sessionId = wsData.sessionId;
+      if (!sessionId) return;
+
       const bg = backgroundProcesses.get(sessionId);
       if (!bg) {
         ws.send(JSON.stringify({ type: "error", message: "No active Claude process" }));
@@ -644,7 +666,17 @@ const server = Bun.serve({
     },
 
     close(ws) {
-      const { sessionId } = ws.data as { sessionId: string };
+      const wsData = ws.data as { type?: string; sessionId?: string };
+
+      // Handle keepalive disconnections
+      if (wsData.type === "keepalive") {
+        console.log("Keepalive connection closed");
+        return;
+      }
+
+      const sessionId = wsData.sessionId;
+      if (!sessionId) return;
+
       const bg = backgroundProcesses.get(sessionId);
 
       if (bg) {
