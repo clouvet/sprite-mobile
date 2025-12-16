@@ -6,6 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#1a1a1a">
+  <!-- Turbo/Hotwire Native: hide native navigation bar, we use our own header -->
+  <meta name="turbo:native-navigation" content="hidden">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>Sprite Code</title>
@@ -35,8 +37,10 @@
 
     html, body {
       height: 100%;
+      min-height: 100%;
+      min-height: -webkit-fill-available;
       overflow: hidden;
-      background: var(--bg);
+      background: var(--bg-secondary);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
       font-size: 16px;
@@ -49,6 +53,8 @@
       display: flex;
       height: 100%;
       height: 100dvh;
+      min-height: 100%;
+      min-height: -webkit-fill-available;
     }
 
     /* Sidebar */
@@ -185,6 +191,9 @@
       flex-direction: column;
       height: 100%;
       padding-top: var(--safe-top);
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
     }
 
     /* Header */
@@ -220,6 +229,59 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      cursor: pointer;
+      padding: 4px 8px;
+      margin: -4px -8px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    header h1:active {
+      background: var(--bg-tertiary);
+    }
+
+    header h1.editing {
+      background: var(--input-bg);
+      cursor: text;
+    }
+
+    #title-input {
+      font-size: 17px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      width: 100%;
+      outline: none;
+      padding: 0;
+    }
+
+    #regenerate-title-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-right: 4px;
+    }
+
+    #regenerate-title-btn.visible {
+      display: flex;
+    }
+
+    #regenerate-title-btn:active {
+      background: var(--bg-tertiary);
+    }
+
+    #regenerate-title-btn.spinning svg {
+      animation: spin 1s linear infinite;
     }
 
     #status {
@@ -288,6 +350,8 @@
       padding: 16px;
       -webkit-overflow-scrolling: touch;
       display: none;
+      min-width: 0;
+      max-width: 100%;
     }
 
     #messages.active {
@@ -297,6 +361,8 @@
     .message {
       margin-bottom: 16px;
       animation: fadeIn 0.2s ease;
+      max-width: 100%;
+      overflow: hidden;
     }
 
     @keyframes fadeIn {
@@ -317,6 +383,8 @@
       max-width: 100%;
       word-wrap: break-word;
       overflow-wrap: break-word;
+      word-break: break-word;
+      overflow: hidden;
     }
 
     .message.user .message-content {
@@ -357,6 +425,7 @@
       border-radius: 8px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
+      max-width: 100%;
     }
 
     .message-content pre code {
@@ -441,6 +510,7 @@
       border-top: 1px solid var(--border);
       display: none;
     }
+
 
     #input-area.active {
       display: block;
@@ -838,6 +908,11 @@
       <header>
         <button id="menu-btn">☰</button>
         <h1 id="chat-title">Sprite Code</h1>
+        <button id="regenerate-title-btn" title="Regenerate title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+        </button>
         <div id="status">Disconnected</div>
         <button id="settings-btn" title="Manage Sprites">⚙</button>
       </header>
@@ -865,7 +940,7 @@
             </svg>
           </button>
           <input type="file" id="file-input" accept="image/*" hidden>
-          <textarea id="input" placeholder="Message Claude..." rows="1" enterkeyhint="send"></textarea>
+          <textarea id="input" placeholder="Message Claude..." rows="1" enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false"></textarea>
           <button id="send" disabled>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -898,6 +973,28 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
   <script>
+    // Hotwire Native Bridge - request to hide native navigation
+    (function() {
+      // Check if we're in a Hotwire Native context
+      if (window.Turbo && window.Turbo.navigator && window.Turbo.navigator.adapter) {
+        // Try to hide native navigation bar
+        try {
+          window.Turbo.navigator.adapter.visitProposedToLocation = function(location, options) {
+            options.action = options.action || 'advance';
+            return true;
+          };
+        } catch (e) {}
+      }
+
+      // Alternative: Use Strada bridge if available
+      if (window.bridge) {
+        try {
+          window.bridge.send('hideNavBar');
+        } catch (e) {}
+      }
+    })();
+  </script>
+  <script>
     // Elements
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('overlay');
@@ -913,6 +1010,7 @@
     const sendBtn = document.getElementById('send');
     const statusEl = document.getElementById('status');
     const settingsBtn = document.getElementById('settings-btn');
+    const regenerateTitleBtn = document.getElementById('regenerate-title-btn');
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
     const imagePreview = document.getElementById('image-preview');
@@ -936,6 +1034,8 @@
     let assistantContent = '';
     let sprites = [];
     let pendingImage = null; // { id, filename, mediaType, url, localUrl }
+    let isEditingTitle = false;
+    let messageCountSinceLastTitleUpdate = 0;
 
     // Keepalive WebSocket - keeps sprite awake while app is open
     function connectKeepalive() {
@@ -1062,6 +1162,8 @@
       messagesEl.innerHTML = '';
       renderSessionsList();
       connectWs(session.id);
+      regenerateTitleBtn.classList.add('visible');
+      messageCountSinceLastTitleUpdate = 0;
     }
 
     function showEmptyState() {
@@ -1071,6 +1173,7 @@
       inputArea.classList.remove('active');
       statusEl.textContent = 'Disconnected';
       statusEl.className = '';
+      regenerateTitleBtn.classList.remove('visible');
     }
 
     // WebSocket
@@ -1241,6 +1344,8 @@
         contentEl.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
         currentAssistantMessage = null;
         assistantContent = '';
+        // Track for auto title regeneration
+        maybeAutoRegenerateTitle();
       }
     }
 
@@ -1351,7 +1456,9 @@
       inputEl.value = '';
       inputEl.style.height = 'auto';
       clearPendingImage();
-      inputEl.focus();
+
+      // Blur to dismiss keyboard on mobile
+      inputEl.blur();
     }
 
     function clearPendingImage() {
@@ -1402,6 +1509,89 @@
         alert('Failed to upload image');
       }
     }
+
+    // Title editing
+    function startEditingTitle() {
+      if (!currentSession || isEditingTitle) return;
+      isEditingTitle = true;
+      chatTitle.classList.add('editing');
+      const currentName = currentSession.name;
+      chatTitle.innerHTML = `<input type="text" id="title-input" value="${escapeHtml(currentName)}">`;
+      const titleInput = document.getElementById('title-input');
+      titleInput.focus();
+      titleInput.select();
+
+      titleInput.addEventListener('blur', () => finishEditingTitle(titleInput.value));
+      titleInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          titleInput.blur();
+        } else if (e.key === 'Escape') {
+          titleInput.value = currentName;
+          titleInput.blur();
+        }
+      });
+    }
+
+    async function finishEditingTitle(newName) {
+      if (!isEditingTitle) return;
+      isEditingTitle = false;
+      chatTitle.classList.remove('editing');
+
+      newName = newName.trim();
+      if (!newName) newName = currentSession.name;
+
+      chatTitle.textContent = newName;
+
+      if (newName !== currentSession.name && currentSession) {
+        currentSession.name = newName;
+        await fetch(`/api/sessions/${currentSession.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName }),
+        });
+        loadSessions();
+      }
+    }
+
+    async function regenerateTitle() {
+      if (!currentSession) return;
+      regenerateTitleBtn.classList.add('spinning');
+
+      try {
+        const res = await fetch(`/api/sessions/${currentSession.id}/regenerate-title`, {
+          method: 'POST',
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          currentSession.name = data.name;
+          chatTitle.textContent = data.name;
+          loadSessions();
+          messageCountSinceLastTitleUpdate = 0;
+        }
+      } catch (err) {
+        console.error('Failed to regenerate title:', err);
+      } finally {
+        regenerateTitleBtn.classList.remove('spinning');
+      }
+    }
+
+    // Auto-regenerate title periodically (every 6 assistant messages)
+    function maybeAutoRegenerateTitle() {
+      messageCountSinceLastTitleUpdate++;
+      if (messageCountSinceLastTitleUpdate >= 6 && currentSession) {
+        regenerateTitle();
+      }
+    }
+
+    chatTitle.addEventListener('click', (e) => {
+      if (currentSession && !isEditingTitle) {
+        startEditingTitle();
+      }
+    });
+
+    regenerateTitleBtn.addEventListener('click', regenerateTitle);
 
     // Event listeners
     inputEl.addEventListener('input', () => {
@@ -1550,13 +1740,17 @@
     let pullStartY = 0;
     let isPulling = false;
     let pullDistance = 0;
+    let pullStartedOnHeader = false;
     const PULL_THRESHOLD = 80;
+    const headerEl = document.querySelector('header');
 
-    function canPullRefresh() {
-      // Only allow pull refresh when at top of scrollable content
-      // and sidebar/modal are closed
+    function canPullRefresh(fromHeader = false) {
+      // Only allow pull refresh when sidebar/modal are closed
       if (sidebar.classList.contains('open')) return false;
       if (spritesModal.classList.contains('open')) return false;
+
+      // If started on header, always allow
+      if (fromHeader || pullStartedOnHeader) return true;
 
       // Check if messages area is at top or we're in empty state
       if (messagesEl.classList.contains('active')) {
@@ -1566,7 +1760,10 @@
     }
 
     document.addEventListener('touchstart', (e) => {
-      if (!canPullRefresh()) return;
+      // Check if touch started on header
+      pullStartedOnHeader = headerEl && headerEl.contains(e.target);
+
+      if (!canPullRefresh(pullStartedOnHeader)) return;
       pullStartY = e.touches[0].clientY;
       isPulling = true;
       pullDistance = 0;
@@ -1601,6 +1798,7 @@
     document.addEventListener('touchend', () => {
       if (!isPulling) return;
       isPulling = false;
+      pullStartedOnHeader = false;
 
       pullIndicator.style.transition = '';
 

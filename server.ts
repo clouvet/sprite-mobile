@@ -52,7 +52,7 @@ interface BackgroundProcess {
   buffer: string;
   assistantBuffer: string;
   sessionId: string;
-  ws: WebSocket | null; // null if client disconnected
+  clients: Set<WebSocket>; // Multiple clients can connect to same session
   startedAt: number;
   isGenerating: boolean; // true while Claude is actively responding
 }
@@ -174,13 +174,17 @@ function spawnClaude(cwd: string, claudeSessionId?: string): Subprocess {
   });
 }
 
-// Send to WebSocket if connected, otherwise just log
+// Broadcast to all connected clients
 function trySend(bg: BackgroundProcess, data: string) {
-  if (bg.ws && bg.ws.readyState === 1) { // OPEN
-    try {
-      bg.ws.send(data);
-    } catch {
-      bg.ws = null;
+  for (const ws of bg.clients) {
+    if (ws.readyState === 1) { // OPEN
+      try {
+        ws.send(data);
+      } catch {
+        bg.clients.delete(ws);
+      }
+    } else {
+      bg.clients.delete(ws);
     }
   }
 }
@@ -333,6 +337,52 @@ function handleApi(req: Request, url: URL): Response | null {
       if (body.cwd) session.cwd = body.cwd;
       saveSessions(sessions);
       return Response.json(session);
+    })();
+  }
+
+  // POST /api/sessions/:id/regenerate-title - Regenerate chat title based on conversation
+  if (req.method === "POST" && path.match(/^\/api\/sessions\/[^/]+\/regenerate-title$/)) {
+    return (async () => {
+      const id = path.split("/")[3];
+      const session = getSession(id);
+      if (!session) return new Response("Not found", { status: 404 });
+
+      const messages = loadMessages(id);
+      if (messages.length === 0) {
+        return new Response("No messages to generate title from", { status: 400 });
+      }
+
+      // Get summary of conversation for title generation
+      const conversationSummary = messages
+        .slice(0, 10) // Use first 10 messages for context
+        .map(m => `${m.role}: ${m.content.slice(0, 200)}`)
+        .join("\n");
+
+      try {
+        const prompt = `Based on this conversation, generate a very short title (3-5 words max) that captures the main topic. Reply with ONLY the title, no quotes or punctuation:\n\n${conversationSummary.slice(0, 1500)}`;
+
+        const proc = spawn({
+          cmd: ["claude", "--print", "-p", prompt],
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+
+        const output = await new Response(proc.stdout).text();
+        const title = output.trim().slice(0, 50) || session.name;
+
+        updateSession(id, { name: title });
+
+        // Notify connected clients
+        const bg = backgroundProcesses.get(id);
+        if (bg) {
+          trySend(bg, JSON.stringify({ type: "refresh_sessions" }));
+        }
+
+        return Response.json({ id, name: title });
+      } catch (err) {
+        console.error("Failed to regenerate title:", err);
+        return new Response("Failed to generate title", { status: 500 });
+      }
     })();
   }
 
@@ -532,10 +582,10 @@ const server = Bun.serve({
       // Check if there's already a background process for this session
       const existingBg = backgroundProcesses.get(sessionId);
       if (existingBg) {
-        console.log(`Client reconnected to session ${sessionId} (process still running)`);
-        existingBg.ws = ws;
+        console.log(`Client joined session ${sessionId} (${existingBg.clients.size + 1} clients now)`);
+        existingBg.clients.add(ws);
 
-        // Send history
+        // Send history to this new client
         const messages = loadMessages(sessionId);
         if (messages.length > 0) {
           ws.send(JSON.stringify({ type: "history", messages }));
@@ -543,7 +593,7 @@ const server = Bun.serve({
 
         // Only notify if Claude is actively generating a response
         if (existingBg.isGenerating) {
-          ws.send(JSON.stringify({ type: "system", message: "Reconnected - Claude is still working", sessionId }));
+          ws.send(JSON.stringify({ type: "system", message: "Joined session - Claude is still working", sessionId }));
           ws.send(JSON.stringify({ type: "processing", isProcessing: true }));
         }
         return;
@@ -564,7 +614,7 @@ const server = Bun.serve({
         buffer: "",
         assistantBuffer: "",
         sessionId,
-        ws,
+        clients: new Set([ws]),
         startedAt: Date.now(),
         isGenerating: false,
       };
@@ -686,9 +736,9 @@ const server = Bun.serve({
       const bg = backgroundProcesses.get(sessionId);
 
       if (bg) {
-        // DON'T kill the process - just detach the websocket
-        console.log(`Client disconnected from session ${sessionId} - Claude continues in background`);
-        bg.ws = null;
+        // Remove this client from the set
+        bg.clients.delete(ws);
+        console.log(`Client left session ${sessionId} (${bg.clients.size} clients remaining)`);
         // Process continues running and will save results
       } else {
         console.log(`Client disconnected from session ${sessionId}`);
@@ -703,7 +753,7 @@ setInterval(() => {
   const maxAge = 30 * 60 * 1000; // 30 minutes
 
   for (const [sessionId, bg] of backgroundProcesses) {
-    if (now - bg.startedAt > maxAge && !bg.ws) {
+    if (now - bg.startedAt > maxAge && bg.clients.size === 0) {
       console.log(`Cleaning up stale process for session ${sessionId}`);
       try { bg.process.kill(9); } catch {}
       backgroundProcesses.delete(sessionId);
