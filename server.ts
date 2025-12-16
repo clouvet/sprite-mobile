@@ -694,17 +694,27 @@ const server = Bun.serve({
           }
 
           // Save user message
-          saveMessage(sessionId, {
+          const userMsg: StoredMessage = {
             role: "user",
             content: data.content || "[Image]",
             timestamp: Date.now(),
             image: imageInfo,
-          });
+          };
+          saveMessage(sessionId, userMsg);
           updateSession(sessionId, {
             lastMessageAt: Date.now(),
             lastMessage: "You: " + (data.content ? data.content.slice(0, 50) : "[Image]"),
             isProcessing: true,
           });
+
+          // Broadcast user message to OTHER clients (not the sender)
+          for (const client of bg.clients) {
+            if (client !== ws && client.readyState === 1) {
+              try {
+                client.send(JSON.stringify({ type: "user_message", message: userMsg }));
+              } catch {}
+            }
+          }
 
           // Send to Claude
           const claudeMsg = JSON.stringify({

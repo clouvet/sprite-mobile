@@ -1262,6 +1262,16 @@
           }
           break;
 
+        case 'user_message':
+          // Another client sent a message - display it and show thinking
+          if (msg.message) {
+            const m = msg.message;
+            const imageUrl = m.image ? `/api/uploads/${currentSession.id}/${m.image.filename}` : null;
+            addUserMessage(m.content, imageUrl);
+            showThinkingIndicator();
+          }
+          break;
+
         case 'assistant':
           if (msg.message?.content) {
             handleAssistantContent(msg.message.content);
