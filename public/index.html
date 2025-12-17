@@ -1300,9 +1300,8 @@
           break;
 
         case 'result':
-          if (msg.result) {
-            removeToolIndicator();
-          }
+          // Tool finished - remove indicator regardless of result content
+          removeToolIndicator();
           break;
       }
       scrollToBottom();
@@ -1327,6 +1326,7 @@
     function startAssistantMessage() {
       if (!currentAssistantMessage) {
         removeThinkingIndicator();
+        removeToolIndicator();
         currentAssistantMessage = document.createElement('div');
         currentAssistantMessage.className = 'message assistant';
         currentAssistantMessage.innerHTML = `
@@ -1348,6 +1348,7 @@
     }
 
     function finalizeAssistantMessage() {
+      removeToolIndicator();
       if (currentAssistantMessage) {
         const contentEl = currentAssistantMessage.querySelector('.message-content');
         contentEl.classList.remove('streaming');
@@ -1406,10 +1407,9 @@
     }
 
     function removeToolIndicator() {
+      // Remove ALL tool indicators
       const indicators = messagesEl.querySelectorAll('.tool-indicator');
-      if (indicators.length > 0) {
-        indicators[indicators.length - 1].remove();
-      }
+      indicators.forEach(ind => ind.remove());
     }
 
     function showThinkingIndicator() {
