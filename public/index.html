@@ -1276,18 +1276,25 @@
     }
 
     // WebSocket
+    let currentWsSessionId = null;
+
     function connectWs(sessionId) {
       // Clear any pending reconnect
       if (wsReconnectTimeout) {
         clearTimeout(wsReconnectTimeout);
         wsReconnectTimeout = null;
       }
-      intentionalDisconnect = false;
 
+      // Close old connection without triggering reconnect for it
       if (ws) {
-        ws.close();
+        const oldWs = ws;
         ws = null;
+        oldWs.onclose = null; // Prevent onclose from firing
+        oldWs.close();
       }
+
+      currentWsSessionId = sessionId;
+      intentionalDisconnect = false;
       currentAssistantMessage = null;
       assistantContent = '';
 
@@ -1329,11 +1336,13 @@
 
     function disconnectWs() {
       intentionalDisconnect = true;
+      currentWsSessionId = null;
       if (wsReconnectTimeout) {
         clearTimeout(wsReconnectTimeout);
         wsReconnectTimeout = null;
       }
       if (ws) {
+        ws.onclose = null; // Prevent onclose from triggering reconnect
         ws.close();
         ws = null;
       }
@@ -1343,7 +1352,7 @@
     }
 
     function scheduleReconnect() {
-      if (intentionalDisconnect || !currentSession) return;
+      if (intentionalDisconnect || !currentWsSessionId) return;
 
       // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
       const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts), 30000);
@@ -1352,10 +1361,12 @@
       statusEl.textContent = `Reconnecting in ${Math.round(delay/1000)}s...`;
       statusEl.className = 'error';
 
+      const sessionToReconnect = currentWsSessionId;
       wsReconnectTimeout = setTimeout(() => {
-        if (currentSession && !intentionalDisconnect) {
+        // Only reconnect if we're still trying to connect to the same session
+        if (currentWsSessionId === sessionToReconnect && !intentionalDisconnect) {
           statusEl.textContent = 'Reconnecting...';
-          connectWs(currentSession.id);
+          connectWs(sessionToReconnect);
         }
       }, delay);
     }
