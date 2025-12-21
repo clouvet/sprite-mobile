@@ -899,9 +899,60 @@
     #pull-indicator.refreshing .pull-spinner {
       display: block;
     }
+
+    /* Waking overlay - shown while sprite is waking up */
+    #waking-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.3s ease;
+    }
+
+    #waking-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #waking-overlay.removed {
+      display: none;
+    }
+
+    .waking-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    .waking-text {
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .waking-subtext {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
+  <!-- Waking overlay - shown while sprite is waking from suspension -->
+  <div id="waking-overlay">
+    <div class="waking-spinner"></div>
+    <div class="waking-text">Waking sprite...</div>
+    <div class="waking-subtext">This may take a few seconds</div>
+  </div>
+
   <!-- Pull to refresh indicator -->
   <div id="pull-indicator">
     <svg class="pull-arrow" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1015,6 +1066,13 @@
     })();
   </script>
   <script>
+    // Register service worker for offline shell and cached config
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Service worker registered'))
+        .catch((err) => console.log('Service worker registration failed:', err));
+    }
+
     // Elements
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('overlay');
@@ -1044,6 +1102,7 @@
     const spriteAddressInput = document.getElementById('sprite-address-input');
     const addSpriteBtn = document.getElementById('add-sprite-btn');
     const pullIndicator = document.getElementById('pull-indicator');
+    const wakingOverlay = document.getElementById('waking-overlay');
 
     // State
     let sessions = [];
@@ -1080,56 +1139,129 @@
       };
     }
 
-    // Connect keepalive immediately
-    connectKeepalive();
+    // Keepalive will be connected after sprite wakes up in init()
 
-    // Public URL keepalive - pings the public URL every 30 seconds to wake sprite from sleep
+    // Public URL keepalive - pings the public URL every 30 seconds to keep sprite awake
     let spritePublicUrl = null;
     let publicKeepaliveInterval = null;
-    let initialWakeupComplete = false;
 
-    // Initial wakeup ping - must complete before app starts interacting with the sprite
-    async function wakeUpSprite() {
-      try {
-        const res = await fetch('/api/config');
-        const config = await res.json();
-        if (config.publicUrl) {
-          spritePublicUrl = config.publicUrl;
-          console.log('Waking up sprite via public URL:', spritePublicUrl);
+    // Get cached config from service worker
+    function getCachedConfig() {
+      return new Promise((resolve) => {
+        if (!navigator.serviceWorker?.controller) {
+          resolve(null);
+          return;
+        }
 
-          // Send the initial ping and wait for it to complete (or fail)
-          // This gives the sprite a chance to wake up before we try to load sessions
-          try {
-            await fetch(spritePublicUrl, { mode: 'no-cors', cache: 'no-store' });
-            console.log('Initial wake-up ping sent successfully');
-          } catch (err) {
-            console.log('Initial wake-up ping failed (sprite may be waking)');
+        const timeout = setTimeout(() => resolve(null), 1000);
+
+        const handler = (event) => {
+          if (event.data?.type === 'CACHED_CONFIG') {
+            clearTimeout(timeout);
+            navigator.serviceWorker.removeEventListener('message', handler);
+            resolve(event.data.config);
           }
+        };
 
-          // Start the ongoing keepalive interval
+        navigator.serviceWorker.addEventListener('message', handler);
+        navigator.serviceWorker.controller.postMessage({ type: 'GET_CACHED_CONFIG' });
+      });
+    }
+
+    // Cache config in service worker
+    function cacheConfig(config) {
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CACHE_CONFIG', config });
+      }
+    }
+
+    // Hide the waking overlay with animation
+    function hideWakingOverlay() {
+      wakingOverlay.classList.add('hidden');
+      setTimeout(() => wakingOverlay.classList.add('removed'), 300);
+    }
+
+    // Try to fetch config from sprite, with retries
+    async function fetchConfigWithRetry(maxRetries = 10, delay = 1000) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+
+          const res = await fetch('/api/config', { signal: controller.signal });
+          clearTimeout(timeout);
+
+          if (res.ok) {
+            return await res.json();
+          }
+        } catch (err) {
+          console.log(`Config fetch attempt ${i + 1}/${maxRetries} failed, retrying...`);
+        }
+
+        if (i < maxRetries - 1) {
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+      return null;
+    }
+
+    // Wake up sprite using cached or fresh public URL
+    async function wakeUpSprite() {
+      // First, try to get cached config from service worker
+      const cachedConfig = await getCachedConfig();
+
+      if (cachedConfig?.publicUrl) {
+        spritePublicUrl = cachedConfig.publicUrl;
+        console.log('Using cached public URL to wake sprite:', spritePublicUrl);
+
+        // Ping the public URL to wake the sprite
+        try {
+          await fetch(spritePublicUrl, { mode: 'no-cors', cache: 'no-store' });
+          console.log('Wake-up ping sent');
+        } catch (err) {
+          console.log('Wake-up ping sent (no-cors mode)');
+        }
+
+        // Wait for sprite to actually respond
+        const config = await fetchConfigWithRetry();
+        if (config) {
+          spritePublicUrl = config.publicUrl;
+          cacheConfig(config);
           startPublicKeepalive();
+          return true;
+        }
+      }
+
+      // No cached config or wake failed - try fetching directly
+      // (sprite might already be awake)
+      try {
+        const config = await fetchConfigWithRetry(3, 500);
+        if (config?.publicUrl) {
+          spritePublicUrl = config.publicUrl;
+          cacheConfig(config);
+          startPublicKeepalive();
+          return true;
         }
       } catch (err) {
-        console.log('Could not fetch config for public keepalive');
+        console.log('Could not reach sprite');
       }
-      initialWakeupComplete = true;
+
+      return false;
     }
 
     function startPublicKeepalive() {
       if (!spritePublicUrl || publicKeepaliveInterval) return;
 
-      // Ping every 30 seconds (initial ping already sent in wakeUpSprite)
+      // Ping every 30 seconds
       publicKeepaliveInterval = setInterval(pingPublicUrl, 30000);
     }
 
     function pingPublicUrl() {
       if (!spritePublicUrl) return;
 
-      // Use fetch with no-cors mode to ping the public URL
-      // This will wake the sprite even if it's sleeping
       fetch(spritePublicUrl, { mode: 'no-cors', cache: 'no-store' })
         .then(() => console.log('Public keepalive ping sent'))
-        .catch(() => console.log('Public keepalive ping failed (sprite may be waking)'));
+        .catch(() => console.log('Public keepalive ping failed'));
     }
 
     // Configure marked
@@ -2042,8 +2174,26 @@
 
     // Init - wake up sprite first, then load sessions
     async function init() {
-      // First, ping the public URL to wake up the sprite if it's suspended
-      await wakeUpSprite();
+      // Try to wake up the sprite (uses cached public URL if available)
+      const spriteAwake = await wakeUpSprite();
+
+      if (!spriteAwake) {
+        // Sprite couldn't be reached - show error in overlay
+        const wakingText = wakingOverlay.querySelector('.waking-text');
+        const wakingSubtext = wakingOverlay.querySelector('.waking-subtext');
+        if (wakingText) wakingText.textContent = 'Could not reach sprite';
+        if (wakingSubtext) wakingSubtext.textContent = 'Check your connection and try again';
+
+        // Keep trying in background
+        setTimeout(init, 5000);
+        return;
+      }
+
+      // Sprite is awake - hide overlay and load app
+      hideWakingOverlay();
+
+      // Start keepalive WebSocket now that sprite is awake
+      connectKeepalive();
 
       // Now load sessions and restore state
       await loadSessions();
