@@ -1,7 +1,7 @@
 // Service Worker for Sprite Code PWA
 // Caches shell for offline-first loading and stores public URL for sprite wake-up
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const CONFIG_CACHE = `config-${CACHE_VERSION}`;
 
@@ -193,6 +193,33 @@ self.addEventListener('message', (event) => {
           event.source.postMessage({ type: 'CACHED_CONFIG', config: null });
         }
       });
+    });
+  }
+
+  if (event.data.type === 'REFRESH_CACHE') {
+    // Re-cache shell files - called when page loads successfully
+    caches.open(SHELL_CACHE).then(async (cache) => {
+      for (const url of SHELL_FILES) {
+        try {
+          const response = await fetch(url, { cache: 'reload' });
+          if (response.ok) {
+            await cache.put(url, response);
+            console.log(`Refreshed cache: ${url}`);
+          }
+        } catch (err) {
+          console.log(`Failed to refresh ${url}:`, err);
+        }
+      }
+      // Also refresh CDN files
+      for (const url of CDN_FILES) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            await cache.put(url, response);
+          }
+        } catch (err) {}
+      }
+      event.source?.postMessage({ type: 'CACHE_REFRESHED' });
     });
   }
 });

@@ -2358,6 +2358,11 @@
       // Sprite is awake - hide overlay and load app
       hideWakingOverlay();
 
+      // Refresh service worker cache while we have network access
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'REFRESH_CACHE' });
+      }
+
       // Start keepalive WebSocket now that sprite is awake
       connectKeepalive();
 
