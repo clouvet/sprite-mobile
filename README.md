@@ -22,7 +22,19 @@ If running elsewhere, you'll need to install these manually and authenticate Cla
 - **Auto-naming**: Chat sessions are automatically named based on the first message
 - **Sprite Profiles**: Save connections to other Sprite instances
 
+## Sprite Setup
+
+To set up a fresh Sprite with all dependencies, authentication, and services:
+
+```bash
+curl -fsSL https://gist.githubusercontent.com/clouvet/901dabc09e62648fa394af65ad004d04/raw/sprite-setup.sh | bash
+```
+
+This script will configure hostname, git, Claude CLI, GitHub CLI, Fly.io, Tailscale, and start the required services.
+
 ## Quick Start
+
+If you prefer to set things up manually:
 
 ```bash
 git clone <repo-url> sprite-mobile
