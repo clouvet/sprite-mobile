@@ -19,8 +19,14 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Claude Code
+.claude/
+
+# iOS/Xcode
 ios/.swiftpm/
 ios/**/xcuserdata/
+ios/**/Package.resolved
 
 # Bun
 *.lockb
