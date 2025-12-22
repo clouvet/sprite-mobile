@@ -38,6 +38,8 @@ To set up a fresh Sprite with all dependencies, authentication, and services:
 
 The script will prompt for the public URL and configure hostname, git, Claude CLI, GitHub CLI, Fly.io, Tailscale, and start the required services. The script is idempotent and can be safely re-run. It supports both old (`curl-sprite-api`) and new (`sprite-env`) sprite API commands.
 
+The app is installed to `~/.sprite-mobile` (hidden directory). On each service start, it attempts to auto-update via `git pull` so all sprites receive updates when they wake up.
+
 **Note:** During authentication:
 - Claude CLI may start a new Claude session after completing. Just type `exit` or press `Ctrl+C` to exit and continue.
 - Sprites CLI will prompt you to create a new sprite. After creating it, exit the sprite console to continue with setup.
