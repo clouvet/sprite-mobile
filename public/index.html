@@ -1865,11 +1865,51 @@
       imagePreviewName.textContent = '';
     }
 
+    // Resize image if too large (max 2048px on longest side)
+    async function resizeImage(file, maxSize = 2048) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+
+          // If image is small enough, return original
+          if (width <= maxSize && height <= maxSize) {
+            resolve(file);
+            return;
+          }
+
+          // Calculate new dimensions
+          if (width > height) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+
+          // Draw to canvas and export
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob((blob) => {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          }, 'image/jpeg', 0.85);
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
     async function uploadImage(file) {
       if (!currentSession) return;
 
+      // Resize if needed
+      const resizedFile = await resizeImage(file);
+
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', resizedFile);
 
       try {
         const res = await fetch(`/api/upload?session=${currentSession.id}`, {
