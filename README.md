@@ -130,7 +130,7 @@ To prevent your Sprite from sleeping while the app is open, configure the public
 
 1. Create a `.env` file with your Sprite's public URL:
 ```bash
-echo 'SPRITE_PUBLIC_URL=https://your-sprite.sprites.app' > /home/sprite/sprite-mobile/.env
+echo 'SPRITE_PUBLIC_URL=https://your-sprite.sprites.app' > /home/sprite/.sprite-mobile/.env
 ```
 
 2. Restart the service to pick up the change:

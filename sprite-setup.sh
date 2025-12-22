@@ -326,7 +326,7 @@ fi
 echo ""
 echo "=== Step 9: sprite-mobile Setup ==="
 
-SPRITE_MOBILE_DIR="$HOME/sprite-mobile"
+SPRITE_MOBILE_DIR="$HOME/.sprite-mobile"
 
 if [ -d "$SPRITE_MOBILE_DIR" ]; then
     echo "sprite-mobile already exists, pulling latest..."
@@ -350,8 +350,8 @@ if sprite_api /v1/services 2>/dev/null | grep -q '"sprite-mobile"'; then
 else
     echo "Starting sprite-mobile service on port $APP_PORT..."
     sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
-      \"cmd\": \"bun\",
-      \"args\": [\"run\", \"$SPRITE_MOBILE_DIR/server.ts\"]
+      \"cmd\": \"bash\",
+      \"args\": [\"-c\", \"cd $SPRITE_MOBILE_DIR && git pull --ff-only || true; bun run server.ts\"]
     }"
 fi
 
