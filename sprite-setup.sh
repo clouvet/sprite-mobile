@@ -362,7 +362,7 @@ echo ""
 echo "=== Step 10: Wake-Up Server ==="
 echo "Public endpoint on port $WAKEUP_PORT to wake sprite from suspension"
 
-WAKEUP_DIR="$HOME/wake-up-server"
+WAKEUP_DIR="$HOME/.wake-up-server"
 
 # Create wake-up server if it doesn't exist
 if [ ! -d "$WAKEUP_DIR" ]; then
