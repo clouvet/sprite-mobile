@@ -1207,7 +1207,39 @@
 
     // Public URL keepalive - pings the public URL every 30 seconds to keep sprite awake
     let spritePublicUrl = null;
+    let spriteName = 'Sprite Code'; // Default, will be updated from publicUrl
     let publicKeepaliveInterval = null;
+
+    // Extract and sanitize hostname from public URL
+    function getSpriteNameFromUrl(url) {
+      if (!url) return null;
+      try {
+        const hostname = new URL(url).hostname;
+        // Extract subdomain (first part before first dot)
+        const subdomain = hostname.split('.')[0];
+        // Sanitize: only allow alphanumeric, hyphens, underscores
+        const sanitized = subdomain.replace(/[^a-zA-Z0-9\-_]/g, '');
+        return sanitized || null;
+      } catch {
+        return null;
+      }
+    }
+
+    // Update displayed sprite name
+    function updateSpriteName(name) {
+      spriteName = name || 'Sprite Code';
+      // Update header title if showing empty state
+      if (emptyState.style.display !== 'none') {
+        chatTitle.textContent = spriteName;
+      }
+      // Update welcome message
+      const welcomeH2 = emptyState.querySelector('h2');
+      if (welcomeH2) {
+        welcomeH2.textContent = `Welcome to ${spriteName}`;
+      }
+      // Update page title
+      document.title = spriteName;
+    }
 
     // Get cached config from service worker
     function getCachedConfig() {
@@ -1293,6 +1325,7 @@
 
       if (cachedConfig?.publicUrl) {
         spritePublicUrl = cachedConfig.publicUrl;
+        updateSpriteName(getSpriteNameFromUrl(spritePublicUrl));
         wakeLog('Pinging: ' + spritePublicUrl);
 
         // Ping the public URL to wake the sprite
@@ -1309,6 +1342,7 @@
         if (config) {
           wakeLog('Sprite responded!');
           spritePublicUrl = config.publicUrl;
+          updateSpriteName(getSpriteNameFromUrl(spritePublicUrl));
           cacheConfig(config);
           startPublicKeepalive();
           return true;
@@ -1324,6 +1358,7 @@
         if (config?.publicUrl) {
           wakeLog('Direct connection OK');
           spritePublicUrl = config.publicUrl;
+          updateSpriteName(getSpriteNameFromUrl(spritePublicUrl));
           cacheConfig(config);
           startPublicKeepalive();
           return true;
@@ -1493,7 +1528,7 @@
     }
 
     function showEmptyState() {
-      chatTitle.textContent = 'Sprite Code';
+      chatTitle.textContent = spriteName;
       emptyState.style.display = 'flex';
       messagesEl.classList.remove('active');
       inputArea.classList.remove('active');
