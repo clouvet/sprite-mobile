@@ -581,7 +581,7 @@ function addCorsHeaders(response: Response): Response {
 const server = Bun.serve({
   port: PORT,
 
-  fetch(req, server) {
+  async fetch(req, server) {
     const url = new URL(req.url);
 
     // Handle CORS preflight
@@ -590,7 +590,7 @@ const server = Bun.serve({
     }
 
     if (url.pathname.startsWith("/api/")) {
-      const response = handleApi(req, url);
+      const response = await handleApi(req, url);
       if (response) return addCorsHeaders(response);
     }
 
