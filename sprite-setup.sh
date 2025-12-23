@@ -129,6 +129,11 @@ if [ -n "$SPRITE_PUBLIC_URL" ]; then
             echo "Setting hostname to: $SUBDOMAIN"
             echo "$SUBDOMAIN" | sudo tee /etc/hostname > /dev/null
             sudo hostname "$SUBDOMAIN"
+            # Add to /etc/hosts so sudo can resolve it
+            if ! grep -q "127.0.0.1.*$SUBDOMAIN" /etc/hosts 2>/dev/null; then
+                echo "127.0.0.1 $SUBDOMAIN" | sudo tee -a /etc/hosts > /dev/null
+                echo "  Added $SUBDOMAIN to /etc/hosts"
+            fi
             echo "Hostname changed from '$CURRENT_HOSTNAME' to '$SUBDOMAIN'"
         fi
     fi
