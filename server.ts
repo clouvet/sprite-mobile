@@ -4,6 +4,7 @@ import { ensureDirectories, getSession } from "./lib/storage";
 import { cleanupStaleProcesses } from "./lib/claude";
 import { handleApi } from "./routes/api";
 import { websocketHandlers, allClients } from "./routes/websocket";
+import { initNetwork, registerSprite, updateHeartbeat, buildSpriteRegistration, isNetworkEnabled } from "./lib/network";
 
 // Load .env file if present
 const ENV_FILE = join(import.meta.dir, ".env");
@@ -110,6 +111,21 @@ const server = Bun.serve({
 
 // Cleanup stale processes every minute
 setInterval(cleanupStaleProcesses, 60 * 1000);
+
+// Initialize sprite network for discovery
+const networkEnabled = initNetwork();
+if (networkEnabled) {
+  // Register this sprite on startup
+  const spriteInfo = buildSpriteRegistration();
+  registerSprite(spriteInfo)
+    .then(() => console.log(`Registered in sprite network as: ${spriteInfo.hostname}`))
+    .catch((err) => console.error("Failed to register in sprite network:", err));
+
+  // Heartbeat every 5 minutes to update lastSeen
+  setInterval(() => {
+    updateHeartbeat().catch((err) => console.error("Heartbeat failed:", err));
+  }, 5 * 60 * 1000);
+}
 
 // Watch public directory for changes and notify clients to reload
 let reloadDebounce: ReturnType<typeof setTimeout> | null = null;

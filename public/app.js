@@ -34,6 +34,10 @@
     const spriteAddressInput = document.getElementById('sprite-address-input');
     const addSpriteBtn = document.getElementById('add-sprite-btn');
     const pullIndicator = document.getElementById('pull-indicator');
+    const networkSpritesSection = document.getElementById('network-sprites-section');
+    const networkSpritesList = document.getElementById('network-sprites-list');
+    const refreshNetworkBtn = document.getElementById('refresh-network-btn');
+    const spritesSeparator = document.getElementById('sprites-separator');
     const wakingOverlay = document.getElementById('waking-overlay');
     const switchingOverlay = document.getElementById('switching-overlay');
 
@@ -45,6 +49,8 @@
     let currentAssistantMessage = null;
     let assistantContent = '';
     let sprites = [];
+    let networkSprites = [];
+    let networkEnabled = false;
     let pendingImage = null; // { id, filename, mediaType, url, localUrl }
     let isEditingTitle = false;
     let messageCountSinceLastTitleUpdate = 0;
@@ -1144,6 +1150,9 @@
     // Sprites management
     function openSpritesModal() {
       loadSprites();
+      if (networkEnabled) {
+        loadNetworkSprites();
+      }
       spritesModal.classList.add('open');
     }
 
@@ -1313,6 +1322,122 @@
     // Make deleteSprite global for onclick
     window.deleteSprite = deleteSprite;
 
+    // Network sprites management
+    async function checkNetworkStatus() {
+      try {
+        const res = await fetch('/api/network/status');
+        const status = await res.json();
+        networkEnabled = status.enabled;
+        if (networkEnabled && networkSpritesSection) {
+          networkSpritesSection.style.display = 'block';
+        }
+      } catch (err) {
+        console.log('Network status check failed:', err);
+      }
+    }
+
+    async function loadNetworkSprites() {
+      if (!networkEnabled) return;
+
+      try {
+        const res = await fetch('/api/network/sprites');
+        networkSprites = await res.json();
+        renderNetworkSpritesList();
+      } catch (err) {
+        console.log('Failed to load network sprites:', err);
+      }
+    }
+
+    function renderNetworkSpritesList() {
+      if (!networkSpritesList) return;
+
+      // Filter out self and sort by status/name
+      const otherSprites = networkSprites
+        .filter(s => !s.isSelf)
+        .sort((a, b) => {
+          const statusOrder = { online: 0, recent: 1, offline: 2 };
+          const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+          if (statusDiff !== 0) return statusDiff;
+          return (a.displayName || a.hostname).localeCompare(b.displayName || b.hostname);
+        });
+
+      if (otherSprites.length === 0) {
+        networkSpritesList.innerHTML = '<div class="sprites-empty">No other sprites in network</div>';
+        if (spritesSeparator) spritesSeparator.style.display = 'none';
+        return;
+      }
+
+      // Show separator if we have manual sprites too
+      if (spritesSeparator) {
+        spritesSeparator.style.display = sprites.length > 0 ? 'flex' : 'none';
+      }
+
+      networkSpritesList.innerHTML = otherSprites.map(s => `
+        <div class="sprite-item network ${s.status}"
+             data-tailscale-url="${escapeHtml(s.tailscaleUrl || '')}"
+             data-public-url="${escapeHtml(s.publicUrl || '')}">
+          <div class="sprite-status ${s.status}" title="${s.status}"></div>
+          <div class="sprite-info">
+            <div class="sprite-name">${escapeHtml(s.displayName || s.hostname)}</div>
+            <div class="sprite-address">${escapeHtml(s.hostname)}</div>
+            ${s.ownerEmail ? `<div class="sprite-owner">${escapeHtml(s.ownerEmail)}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+
+      // Click handlers for network sprites
+      networkSpritesList.querySelectorAll('.sprite-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const tailscaleUrl = el.dataset.tailscaleUrl;
+          const publicUrl = el.dataset.publicUrl;
+          if (tailscaleUrl) {
+            navigateToNetworkSprite(tailscaleUrl, publicUrl);
+          }
+        });
+      });
+    }
+
+    async function navigateToNetworkSprite(tailscaleUrl, publicUrl) {
+      // Show switching overlay
+      const switchingText = switchingOverlay.querySelector('.switching-text');
+      const switchingSubtext = switchingOverlay.querySelector('.switching-subtext');
+      if (switchingText) switchingText.textContent = 'Switching to sprite...';
+      if (switchingSubtext) switchingSubtext.textContent = 'Waking up the target sprite';
+      switchingOverlay.classList.add('visible');
+      closeSpritesModalFn();
+
+      // Wake via public URL if available
+      if (publicUrl) {
+        try {
+          await fetch(publicUrl, { mode: 'no-cors', cache: 'no-store' });
+        } catch {}
+
+        // Wait for sprite to respond
+        if (switchingSubtext) switchingSubtext.textContent = 'Waiting for sprite to respond...';
+        for (let i = 0; i < 15; i++) {
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(`${tailscaleUrl}/api/config`, {
+              signal: controller.signal,
+              cache: 'no-store'
+            });
+            clearTimeout(timeout);
+            if (res.ok) break;
+          } catch {}
+          if (switchingSubtext) switchingSubtext.textContent = `Waiting for sprite... (${i + 1}/15)`;
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+
+      if (switchingSubtext) switchingSubtext.textContent = 'Navigating...';
+      await new Promise(r => setTimeout(r, 300));
+      window.location.href = tailscaleUrl;
+    }
+
+    // Check network status on startup
+    checkNetworkStatus();
+
     // Sprites modal event listeners
     settingsBtn.addEventListener('click', openSpritesModal);
     closeSpritesModal.addEventListener('click', closeSpritesModalFn);
@@ -1323,6 +1448,9 @@
     spriteAddressInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addSprite();
     });
+    if (refreshNetworkBtn) {
+      refreshNetworkBtn.addEventListener('click', loadNetworkSprites);
+    }
 
     // Pull to refresh
     let pullStartY = 0;

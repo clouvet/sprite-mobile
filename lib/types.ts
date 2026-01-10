@@ -40,3 +40,13 @@ export interface BackgroundProcess {
   startedAt: number;
   isGenerating: boolean;
 }
+
+export interface NetworkSprite {
+  hostname: string;
+  org: string;
+  tailscaleUrl: string;
+  publicUrl: string;
+  ownerEmail?: string;
+  registeredAt: number;
+  lastSeen: number;
+}

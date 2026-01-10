@@ -108,6 +108,21 @@
         <button class="modal-close" id="close-sprites-modal">×</button>
       </div>
       <div class="modal-body">
+        <!-- Network sprites (auto-discovered) -->
+        <div id="network-sprites-section" class="sprites-section" style="display: none;">
+          <div class="sprites-section-header">
+            <h3>Sprite Network</h3>
+            <button id="refresh-network-btn" class="refresh-btn" title="Refresh">&#8635;</button>
+          </div>
+          <div class="network-sprites-list" id="network-sprites-list"></div>
+        </div>
+
+        <!-- Separator between network and manual sprites -->
+        <div id="sprites-separator" class="sprites-separator" style="display: none;">
+          <span>Saved Sprites</span>
+        </div>
+
+        <!-- Manual sprites -->
         <div class="sprites-list" id="sprites-list"></div>
         <div class="add-sprite-form">
           <input type="text" id="sprite-name-input" placeholder="Sprite name (e.g., Work Sprite)">

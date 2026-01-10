@@ -872,6 +872,107 @@
       font-size: 14px;
     }
 
+    /* Network sprites section */
+    .sprites-section {
+      margin-bottom: 16px;
+    }
+
+    .sprites-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .sprites-section-header h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0;
+    }
+
+    .refresh-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .refresh-btn:active {
+      background: var(--bg-tertiary);
+      color: var(--text);
+    }
+
+    .sprites-separator {
+      display: flex;
+      align-items: center;
+      margin: 20px 0 16px;
+      gap: 12px;
+    }
+
+    .sprites-separator::before,
+    .sprites-separator::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .sprites-separator span {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Network sprite item styling */
+    .network-sprites-list {
+      margin-bottom: 8px;
+    }
+
+    .sprite-item.network {
+      border-left: 3px solid var(--accent);
+    }
+
+    .sprite-item.network.offline {
+      opacity: 0.6;
+    }
+
+    .sprite-status {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .sprite-status.online {
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+    }
+
+    .sprite-status.recent {
+      background: #eab308;
+    }
+
+    .sprite-status.offline {
+      background: #6b7280;
+    }
+
+    .sprite-owner {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
     /* Pull to refresh */
     #pull-indicator {
       position: fixed;

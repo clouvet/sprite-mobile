@@ -9,6 +9,7 @@ import {
   generateId, UPLOADS_DIR
 } from "../lib/storage";
 import { backgroundProcesses, trySend } from "../lib/claude";
+import { discoverSprites, getSpriteStatus, getNetworkInfo, getHostname, updateHeartbeat } from "../lib/network";
 
 // Public URL from environment
 const SPRITE_PUBLIC_URL = process.env.SPRITE_PUBLIC_URL || "";
@@ -186,6 +187,35 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     sprites = sprites.filter(s => s.id !== id);
     saveSprites(sprites);
     return new Response(null, { status: 204 });
+  }
+
+  // GET /api/network/status - Check if network is configured
+  if (req.method === "GET" && path === "/api/network/status") {
+    return Response.json(getNetworkInfo());
+  }
+
+  // GET /api/network/sprites - Discover sprites in the network
+  if (req.method === "GET" && path === "/api/network/sprites") {
+    return (async () => {
+      const sprites = await discoverSprites();
+      const currentHostname = getHostname();
+
+      const spritesWithStatus = sprites.map(s => ({
+        ...s,
+        status: getSpriteStatus(s),
+        isSelf: s.hostname === currentHostname,
+      }));
+
+      return Response.json(spritesWithStatus);
+    })();
+  }
+
+  // POST /api/network/heartbeat - Manual heartbeat trigger
+  if (req.method === "POST" && path === "/api/network/heartbeat") {
+    return (async () => {
+      await updateHeartbeat();
+      return Response.json({ ok: true });
+    })();
   }
 
   // POST /api/upload?session={sessionId}
