@@ -474,7 +474,51 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Thinking indicator */
+    /* Activity indicator - shows what Claude is doing */
+    .activity-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      background: var(--bg-tertiary);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .activity-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .activity-content {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .activity-action {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .activity-detail {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: "SF Mono", Monaco, Consolas, monospace;
+      margin-top: 2px;
+    }
+
+    /* Legacy thinking indicator (fallback) */
     .thinking-indicator {
       display: flex;
       align-items: center;
@@ -1185,6 +1229,37 @@
     let messageCountSinceLastTitleUpdate = 0;
     let pendingUserMessage = false; // True while processing incoming user_message
 
+    // Activity indicator state
+    let currentToolName = null;
+    let currentToolInput = '';
+
+    // Tool name to human-readable action mapping
+    const toolActions = {
+      'Read': { action: 'Reading', getDetail: (input) => input?.file_path },
+      'Write': { action: 'Writing', getDetail: (input) => input?.file_path },
+      'Edit': { action: 'Editing', getDetail: (input) => input?.file_path },
+      'Bash': { action: 'Running', getDetail: (input) => input?.command?.slice(0, 60) },
+      'Grep': { action: 'Searching', getDetail: (input) => input?.pattern ? `"${input.pattern}"` : null },
+      'Glob': { action: 'Finding files', getDetail: (input) => input?.pattern },
+      'Task': { action: 'Working on subtask', getDetail: (input) => input?.description },
+      'WebFetch': { action: 'Fetching', getDetail: (input) => input?.url },
+      'WebSearch': { action: 'Searching web', getDetail: (input) => input?.query },
+      'LSP': { action: 'Analyzing code', getDetail: (input) => input?.operation },
+      'TodoWrite': { action: 'Updating tasks', getDetail: () => null },
+      'AskUserQuestion': { action: 'Asking question', getDetail: () => null },
+      'NotebookEdit': { action: 'Editing notebook', getDetail: (input) => input?.notebook_path },
+    };
+
+    function getToolAction(toolName) {
+      return toolActions[toolName] || { action: `Using ${toolName}`, getDetail: () => null };
+    }
+
+    function truncatePath(path, maxLen = 40) {
+      if (!path || path.length <= maxLen) return path;
+      // Show the end of the path (most relevant part)
+      return '...' + path.slice(-(maxLen - 3));
+    }
+
     // Keepalive WebSocket - keeps sprite awake while app is open
     function connectKeepalive() {
       if (keepaliveWs && keepaliveWs.readyState === WebSocket.OPEN) return;
@@ -1746,14 +1821,10 @@
           // Wait for any pending user message to render first
           if (pendingUserMessage) {
             requestAnimationFrame(() => {
-              if (msg.delta?.type === 'text_delta') {
-                appendAssistantText(msg.delta.text);
-              }
+              handleContentBlockDelta(msg);
             });
           } else {
-            if (msg.delta?.type === 'text_delta') {
-              appendAssistantText(msg.delta.text);
-            }
+            handleContentBlockDelta(msg);
           }
           break;
 
@@ -1776,12 +1847,33 @@
             startAssistantMessage();
             appendAssistantText(block.text);
           } else if (block.type === 'tool_use') {
-            addToolIndicator(block.name);
+            addToolIndicator(block.name, block.input);
           }
         }
       } else if (typeof content === 'string') {
         startAssistantMessage();
         appendAssistantText(content);
+      }
+    }
+
+    function handleContentBlockDelta(msg) {
+      if (msg.delta?.type === 'text_delta') {
+        appendAssistantText(msg.delta.text);
+      } else if (msg.delta?.type === 'input_json_delta' && currentToolName) {
+        // Accumulate tool input JSON
+        currentToolInput += msg.delta.partial_json || '';
+
+        // Try to parse and update indicator with details
+        try {
+          const parsed = JSON.parse(currentToolInput);
+          const toolInfo = getToolAction(currentToolName);
+          const detail = toolInfo.getDetail(parsed);
+          if (detail) {
+            updateActivityIndicator(detail);
+          }
+        } catch {
+          // JSON not complete yet, that's fine
+        }
       }
     }
 
@@ -1858,24 +1950,70 @@
       scrollToBottom();
     }
 
-    function addToolIndicator(toolName) {
-      finalizeAssistantMessage();
+    function showActivityIndicator(action, detail = null) {
+      removeActivityIndicator();
       removeThinkingIndicator();
       const indicator = document.createElement('div');
-      indicator.className = 'tool-indicator';
-      indicator.innerHTML = `<div class="spinner"></div><span>Using <strong>${escapeHtml(toolName)}</strong>...</span>`;
+      indicator.className = 'activity-indicator';
+      indicator.innerHTML = `
+        <div class="activity-spinner"></div>
+        <div class="activity-content">
+          <div class="activity-action">${escapeHtml(action)}...</div>
+          ${detail ? `<div class="activity-detail">${escapeHtml(truncatePath(detail))}</div>` : ''}
+        </div>
+      `;
       messagesEl.appendChild(indicator);
       scrollToBottom();
     }
 
-    function removeToolIndicator() {
-      // Remove ALL tool indicators
-      const indicators = messagesEl.querySelectorAll('.tool-indicator');
+    function updateActivityIndicator(detail) {
+      const indicator = messagesEl.querySelector('.activity-indicator');
+      if (indicator) {
+        let detailEl = indicator.querySelector('.activity-detail');
+        if (detail) {
+          if (!detailEl) {
+            detailEl = document.createElement('div');
+            detailEl.className = 'activity-detail';
+            indicator.querySelector('.activity-content').appendChild(detailEl);
+          }
+          detailEl.textContent = truncatePath(detail);
+        }
+      }
+    }
+
+    function removeActivityIndicator() {
+      const indicators = messagesEl.querySelectorAll('.activity-indicator');
       indicators.forEach(ind => ind.remove());
+      // Reset tool state
+      currentToolName = null;
+      currentToolInput = '';
+    }
+
+    function addToolIndicator(toolName, toolInput = null) {
+      finalizeAssistantMessage();
+      currentToolName = toolName;
+      currentToolInput = '';
+
+      const toolInfo = getToolAction(toolName);
+      let detail = null;
+
+      if (toolInput) {
+        try {
+          const parsed = typeof toolInput === 'string' ? JSON.parse(toolInput) : toolInput;
+          detail = toolInfo.getDetail(parsed);
+        } catch {}
+      }
+
+      showActivityIndicator(toolInfo.action, detail);
+    }
+
+    function removeToolIndicator() {
+      removeActivityIndicator();
     }
 
     function showThinkingIndicator() {
       removeThinkingIndicator();
+      removeActivityIndicator();
       const indicator = document.createElement('div');
       indicator.className = 'thinking-indicator';
       indicator.innerHTML = `
