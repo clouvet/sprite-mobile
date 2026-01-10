@@ -10,7 +10,7 @@
       --bg-tertiary: #2d2d2d;
       --text: #e5e5e5;
       --text-muted: #888;
-      --accent: #bf00ff;
+      --accent: #a855f7;
       --user-bg: #3b3b3b;
       --assistant-bg: #252525;
       --border: #333;
@@ -88,7 +88,7 @@
       border-radius: 8px;
       background: var(--accent);
       border: none;
-      color: #1a1a1a;
+      color: #fff;
       font-size: 20px;
       cursor: pointer;
       display: flex;
@@ -327,7 +327,7 @@
     #empty-state button {
       padding: 12px 24px;
       background: var(--accent);
-      color: #1a1a1a;
+      color: #fff;
       border: none;
       border-radius: 12px;
       font-size: 16px;
@@ -598,7 +598,7 @@
       border-radius: 50%;
       background: var(--accent);
       border: none;
-      color: #1a1a1a;
+      color: #fff;
       font-size: 20px;
       cursor: pointer;
       display: flex;
@@ -852,7 +852,7 @@
     .add-sprite-btn {
       padding: 12px;
       background: var(--accent);
-      color: #1a1a1a;
+      color: #fff;
       border: none;
       border-radius: 10px;
       font-size: 15px;
