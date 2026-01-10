@@ -48,6 +48,11 @@
     let pendingImage = null; // { id, filename, mediaType, url, localUrl }
     let isEditingTitle = false;
     let messageCountSinceLastTitleUpdate = 0;
+
+    // Detect if we're on a desktop device (has precise pointer like mouse/trackpad)
+    function isDesktop() {
+      return window.matchMedia('(pointer: fine)').matches;
+    }
     let pendingUserMessage = false; // True while processing incoming user_message
 
     // Activity indicator state
@@ -732,6 +737,10 @@
         assistantContent = '';
         // Track for auto title regeneration
         maybeAutoRegenerateTitle();
+        // Auto-focus input on desktop (not mobile to avoid keyboard popup)
+        if (isDesktop()) {
+          inputEl.focus();
+        }
       }
     }
 
