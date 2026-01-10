@@ -1,9 +1,9 @@
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, watch } from "fs";
 import { join } from "path";
 import { ensureDirectories, getSession } from "./lib/storage";
 import { cleanupStaleProcesses } from "./lib/claude";
 import { handleApi } from "./routes/api";
-import { websocketHandlers } from "./routes/websocket";
+import { websocketHandlers, allClients } from "./routes/websocket";
 
 // Load .env file if present
 const ENV_FILE = join(import.meta.dir, ".env");
@@ -110,5 +110,21 @@ const server = Bun.serve({
 
 // Cleanup stale processes every minute
 setInterval(cleanupStaleProcesses, 60 * 1000);
+
+// Watch public directory for changes and notify clients to reload
+let reloadDebounce: ReturnType<typeof setTimeout> | null = null;
+watch(PUBLIC_DIR, { recursive: true }, (event, filename) => {
+  // Debounce to avoid multiple reloads for rapid changes
+  if (reloadDebounce) clearTimeout(reloadDebounce);
+  reloadDebounce = setTimeout(() => {
+    console.log(`File changed: ${filename}, notifying ${allClients.size} clients to reload`);
+    const msg = JSON.stringify({ type: "reload" });
+    for (const ws of allClients) {
+      try {
+        if (ws.readyState === 1) ws.send(msg);
+      } catch {}
+    }
+  }, 300);
+});
 
 console.log(`Claude Mobile server running on http://localhost:${PORT}`);

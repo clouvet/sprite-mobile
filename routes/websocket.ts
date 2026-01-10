@@ -7,8 +7,12 @@ import {
   handleClaudeOutput, handleClaudeStderr
 } from "../lib/claude";
 
+// Track all connected clients for broadcast messages (e.g., reload)
+export const allClients = new Set<any>();
+
 export const websocketHandlers = {
   open(ws: any) {
+    allClients.add(ws);
     const data = ws.data as { type?: string; sessionId?: string; cwd?: string; claudeSessionId?: string };
 
     // Handle keepalive connections
@@ -177,6 +181,7 @@ export const websocketHandlers = {
   },
 
   close(ws: any) {
+    allClients.delete(ws);
     const wsData = ws.data as { type?: string; sessionId?: string };
 
     // Handle keepalive disconnections

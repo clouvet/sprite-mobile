@@ -97,6 +97,16 @@
         console.log('Keepalive connected - sprite will stay awake');
       };
 
+      keepaliveWs.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'reload') {
+            console.log('Server requested reload (via keepalive)');
+            location.reload();
+          }
+        } catch {}
+      };
+
       keepaliveWs.onclose = () => {
         console.log('Keepalive disconnected');
         // Reconnect after a short delay
@@ -432,9 +442,12 @@
       connectWs(session.id);
       regenerateTitleBtn.classList.add('visible');
       messageCountSinceLastTitleUpdate = 0;
+      // Update URL hash to persist session across refreshes
+      history.replaceState(null, '', `#session=${session.id}`);
     }
 
     function showEmptyState() {
+      currentSession = null;
       const emojiHtml = '<span class="sprite-emoji">👾</span>';
       chatTitle.innerHTML = `${escapeHtml(spriteName)} ${emojiHtml}`;
       emptyState.style.display = 'flex';
@@ -443,6 +456,8 @@
       statusEl.textContent = 'Disconnected';
       statusEl.className = '';
       regenerateTitleBtn.classList.remove('visible');
+      // Clear URL hash when no session selected
+      history.replaceState(null, '', location.pathname);
     }
 
     // WebSocket
@@ -547,6 +562,12 @@
           if (msg.message && !msg.message.includes('Connected')) {
             addSystemMessage(msg.message);
           }
+          break;
+
+        case 'reload':
+          // Server detected file changes - reload the page
+          console.log('Server requested reload');
+          location.reload();
           break;
 
         case 'history':
@@ -1429,8 +1450,12 @@
       // Now load sessions and restore state
       await loadSessions();
 
-      // Restore last session if saved (e.g., after pull-to-refresh)
-      const lastSessionId = localStorage.getItem('lastSessionId');
+      // Check URL hash for session ID (e.g., #session=abc123)
+      const hashMatch = location.hash.match(/^#session=(.+)$/);
+      const hashSessionId = hashMatch ? hashMatch[1] : null;
+
+      // Restore session from URL hash, or fallback to localStorage
+      const lastSessionId = hashSessionId || localStorage.getItem('lastSessionId');
       if (lastSessionId) {
         localStorage.removeItem('lastSessionId');
         const session = sessions.find(s => s.id === lastSessionId);
