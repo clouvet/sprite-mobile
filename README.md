@@ -2,7 +2,10 @@
 
 A mobile-friendly web interface for chatting with Claude Code running on a [Sprite](https://sprites.dev). Supports multiple concurrent chat sessions, image uploads, and persistent message history.
 
-<img src="docs/screenshot.png" width="300" alt="Sprite Mobile Screenshot">
+<p>
+  <img src="docs/screenshot-chat.png" width="280" alt="Chat View">
+  <img src="docs/screenshot-sidebar.png" width="280" alt="Session Sidebar">
+</p>
 
 ## Prerequisites
 
