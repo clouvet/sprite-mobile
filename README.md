@@ -20,14 +20,18 @@ If running elsewhere, you'll need to install these manually and authenticate Cla
 - **Session Resume**: Reconnecting to a session resumes the existing Claude conversation
 - **Image Support**: Upload and send images to Claude for analysis (auto-resized for API limits)
 - **Real-time Streaming**: Responses stream in real-time via WebSocket
+- **Activity Indicators**: See exactly what Claude is doing (reading files, running commands, searching)
 - **Multi-client Support**: Multiple browser tabs can connect to the same session
 - **Auto-naming**: Chat sessions are automatically named based on conversation content
+- **Smart Auto-focus**: Input field auto-focuses on desktop after Claude responds (disabled on mobile to avoid keyboard popup)
 - **Dynamic Branding**: Header displays the sprite's hostname with a neon green 👾
 - **Tailscale Integration**: HTTPS access via Tailscale Serve with automatic redirect from public URL
 - **Tailnet Gate**: Public URL wakes sprite and redirects to Tailscale URL (if on tailnet)
 - **PWA Support**: Installable as a Progressive Web App, works offline (requires HTTPS via Tailscale Serve)
 - **Auto-update**: Pulls latest code when the service starts
 - **Native iOS App**: SwiftUI wrapper for a better mobile experience
+- **Sprite Network**: Automatic discovery of other sprites in your Fly.io organization via shared Tigris bucket
+- **Hot Reloading**: Server code changes take effect immediately without restart
 
 ## Access Model
 
@@ -74,6 +78,7 @@ The script will:
 3. Install and configure Tailscale
 4. Install ttyd (web terminal)
 5. Clone and run sprite-mobile
+5.5. Configure Sprite Network (optional - enables automatic discovery of other sprites in your org)
 6. Set up Tailscale Serve (HTTPS for PWA support)
 7. Start the Tailnet Gate (public entry point)
 
@@ -106,6 +111,9 @@ Open `http://localhost:8081` in a browser to access the chat interface.
 | `PORT` | Server port | `8081` |
 | `SPRITE_PUBLIC_URL` | Public URL for waking sprite | `https://my-sprite.fly.dev` |
 | `TAILSCALE_SERVE_URL` | Tailscale HTTPS URL | `https://my-sprite.ts.net` |
+| `SPRITE_HOSTNAME` | Hostname for sprite network registration | `my-sprite` |
+| `SPRITE_NETWORK_CREDS` | Path to Tigris credentials file | `~/.sprite-network/credentials.json` |
+| `SPRITE_NETWORK_ORG` | Fly.io org for sprite network | `my-org` |
 
 These are automatically configured by the setup script.
 
@@ -147,6 +155,9 @@ All data is stored in the `data/` directory:
 | GET | `/api/sprites` | List saved Sprite profiles |
 | POST | `/api/sprites` | Add a Sprite profile |
 | DELETE | `/api/sprites/:id` | Remove a Sprite profile |
+| GET | `/api/network/status` | Check if sprite network is configured |
+| GET | `/api/network/sprites` | Discover sprites in the network |
+| POST | `/api/network/heartbeat` | Manual heartbeat trigger |
 
 ### WebSocket
 
