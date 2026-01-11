@@ -23,10 +23,5 @@ Thumbs.db
 # Claude Code
 .claude/
 
-# iOS/Xcode
-ios/.swiftpm/
-ios/**/xcuserdata/
-ios/**/Package.resolved
-
 # Bun
 *.lockb

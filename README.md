@@ -32,7 +32,6 @@ If running elsewhere, you'll need to install these manually and authenticate Cla
 - **Tailnet Gate**: Public URL wakes sprite and redirects to Tailscale URL (if on tailnet)
 - **PWA Support**: Installable as a Progressive Web App, works offline (requires HTTPS via Tailscale Serve)
 - **Auto-update**: Pulls latest code when the service starts
-- **Native iOS App**: SwiftUI wrapper for a better mobile experience
 - **Sprite Network**: Automatic discovery of other sprites in your Fly.io organization via shared Tigris bucket
 - **Hot Reloading**: Server code changes take effect immediately without restart
 
@@ -238,7 +237,3 @@ Restart if needed:
 ```bash
 tailscale serve --bg 8081
 ```
-
-## iOS App
-
-The `ios/` directory contains a native iOS wrapper app that provides a more native mobile experience. See [ios/README.md](ios/README.md) for build instructions.
