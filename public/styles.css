@@ -157,7 +157,7 @@
     }
 
     .session-delete:active {
-      background: #ef4444;
+      background: #db5a7a;
       color: white;
     }
 
@@ -812,7 +812,7 @@
     }
 
     .sprite-delete:active {
-      background: #ef4444;
+      background: #db5a7a;
       color: white;
     }
 
