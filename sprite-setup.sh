@@ -35,6 +35,7 @@ echo "  3. Authenticate Claude CLI"
 echo "  4. Authenticate GitHub CLI"
 echo "  5. Install and authenticate Fly.io CLI (flyctl)"
 echo "  6. Install and authenticate Sprites CLI"
+echo "  6.5. Configure Sprite Network (optional - for sprite discovery)"
 echo "  7. Install and configure Tailscale"
 echo "  8. Install ttyd (web terminal) on port $TTYD_PORT"
 echo "  9. Clone sprite-mobile and run on port $APP_PORT"
@@ -263,6 +264,107 @@ else
     echo "Logging in to Sprites CLI..."
     echo "Follow the prompts to authenticate:"
     sprite login
+fi
+
+# ============================================
+# Step 6.5: Sprite Network (Optional)
+# ============================================
+echo ""
+echo "=== Step 6.5: Sprite Network (Optional) ==="
+echo "Sprite Network enables automatic discovery of other sprites in your organization."
+echo "It uses a shared Tigris S3 bucket to register and discover sprites."
+echo ""
+
+SPRITE_NETWORK_DIR="$HOME/.sprite-network"
+SPRITE_NETWORK_CREDS="$SPRITE_NETWORK_DIR/credentials.json"
+
+if [ -f "$SPRITE_NETWORK_CREDS" ]; then
+    echo "Sprite network credentials already configured"
+else
+    read -p "Set up Sprite Network? [y/N]: " setup_network
+    if [ "$setup_network" = "y" ] || [ "$setup_network" = "Y" ]; then
+        echo ""
+        echo "Options:"
+        echo "  1) Create new Tigris bucket (requires flyctl)"
+        echo "  2) Enter existing credentials"
+        echo "  3) Skip"
+        read -p "Choice [1/2/3]: " network_choice
+
+        case "$network_choice" in
+            1)
+                if ! command -v flyctl &>/dev/null; then
+                    echo "flyctl not found. Please install it first or use option 2."
+                else
+                    read -p "Fly.io org name: " FLY_ORG
+                    BUCKET_NAME="sprite-network-${FLY_ORG}"
+                    echo "Creating Tigris bucket: $BUCKET_NAME"
+
+                    # Create the bucket
+                    if flyctl storage create -o "$FLY_ORG" -n "$BUCKET_NAME" --public; then
+                        echo "Bucket created successfully"
+
+                        # Get credentials
+                        echo "Fetching credentials..."
+                        CREDS_OUTPUT=$(flyctl storage dashboard -o "$FLY_ORG" "$BUCKET_NAME" --json 2>/dev/null || echo "{}")
+
+                        if echo "$CREDS_OUTPUT" | grep -q "AWS_ACCESS_KEY_ID"; then
+                            mkdir -p "$SPRITE_NETWORK_DIR"
+                            # Extract credentials from flyctl output
+                            AWS_ACCESS_KEY_ID=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_ACCESS_KEY_ID":"[^"]*"' | cut -d'"' -f4)
+                            AWS_SECRET_ACCESS_KEY=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_SECRET_ACCESS_KEY":"[^"]*"' | cut -d'"' -f4)
+                            AWS_ENDPOINT_URL_S3=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_ENDPOINT_URL_S3":"[^"]*"' | cut -d'"' -f4)
+
+                            cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
+{
+  "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
+  "AWS_ENDPOINT_URL_S3": "$AWS_ENDPOINT_URL_S3",
+  "BUCKET_NAME": "$BUCKET_NAME",
+  "ORG": "$FLY_ORG"
+}
+CREDS_EOF
+                            chmod 600 "$SPRITE_NETWORK_CREDS"
+                            echo "Credentials saved to $SPRITE_NETWORK_CREDS"
+                        else
+                            echo "Could not fetch credentials automatically."
+                            echo "Run: flyctl storage dashboard -o $FLY_ORG $BUCKET_NAME"
+                            echo "Then use option 2 to enter credentials manually."
+                        fi
+                    else
+                        echo "Failed to create bucket. It may already exist - try option 2."
+                    fi
+                fi
+                ;;
+            2)
+                echo ""
+                echo "Enter Tigris bucket credentials:"
+                read -p "AWS_ACCESS_KEY_ID: " AWS_ACCESS_KEY_ID
+                read -p "AWS_SECRET_ACCESS_KEY: " AWS_SECRET_ACCESS_KEY
+                read -p "BUCKET_NAME: " BUCKET_NAME
+                read -p "AWS_ENDPOINT_URL_S3 [https://fly.storage.tigris.dev]: " AWS_ENDPOINT_URL_S3
+                AWS_ENDPOINT_URL_S3="${AWS_ENDPOINT_URL_S3:-https://fly.storage.tigris.dev}"
+                read -p "ORG (Fly.io org name): " FLY_ORG
+
+                mkdir -p "$SPRITE_NETWORK_DIR"
+                cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
+{
+  "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
+  "AWS_ENDPOINT_URL_S3": "$AWS_ENDPOINT_URL_S3",
+  "BUCKET_NAME": "$BUCKET_NAME",
+  "ORG": "$FLY_ORG"
+}
+CREDS_EOF
+                chmod 600 "$SPRITE_NETWORK_CREDS"
+                echo "Credentials saved to $SPRITE_NETWORK_CREDS"
+                ;;
+            *)
+                echo "Skipping Sprite Network setup"
+                ;;
+        esac
+    else
+        echo "Skipping Sprite Network setup"
+    fi
 fi
 
 # ============================================
