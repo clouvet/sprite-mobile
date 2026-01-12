@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Handle Ctrl+C gracefully
+trap 'echo ""; echo "Aborted."; exit 130' INT
+
 # ============================================
 # Sprite Setup Script
 # Run this once after creating a new sprite
