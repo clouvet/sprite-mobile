@@ -24,6 +24,8 @@
       height: 100%;
       background: #1a1a2e;
       background: var(--bg);
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
