@@ -69,6 +69,11 @@
     let currentToolName = null;
     let currentToolInput = '';
 
+    // Voice input state
+    let recognition = null;
+    let isRecording = false;
+    let voiceInputSent = false; // Prevents onresult from updating after send
+
     // Tool name to human-readable action mapping
     const toolActions = {
       'Read': { action: 'Reading', getDetail: (input) => input?.file_path },
@@ -909,6 +914,12 @@
     }
 
     function send() {
+      // Stop voice recording if active
+      if (recognition && isRecording) {
+        voiceInputSent = true; // Prevent onresult from re-populating input
+        recognition.stop();
+      }
+
       const text = inputEl.value.trim();
       const hasImage = pendingImage !== null;
 
@@ -1626,6 +1637,77 @@
 
       pullDistance = 0;
     }, { passive: true });
+
+    // Voice input (Speech Recognition)
+    const micBtn = document.getElementById('mic-btn');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      let finalTranscript = '';
+      let originalInputText = '';
+
+      recognition.onstart = () => {
+        isRecording = true;
+        voiceInputSent = false;
+        micBtn.classList.add('recording');
+        finalTranscript = '';
+        // Save the original input text before we start modifying it
+        originalInputText = inputEl.value;
+      };
+
+      recognition.onend = () => {
+        isRecording = false;
+        micBtn.classList.remove('recording');
+      };
+
+      recognition.onerror = (event) => {
+        console.log('Speech recognition error:', event.error);
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        if (event.error === 'not-allowed') {
+          alert('Microphone access denied. Please enable microphone permissions.');
+        }
+      };
+
+      recognition.onresult = (event) => {
+        // Don't update input if we already sent the message
+        if (voiceInputSent) return;
+
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        // Replace entire input with: original text + final + interim
+        const spacer = originalInputText && !originalInputText.endsWith(' ') ? ' ' : '';
+        inputEl.value = originalInputText + spacer + finalTranscript + interimTranscript;
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+      };
+
+      micBtn.addEventListener('click', () => {
+        if (!currentSession) return;
+
+        if (isRecording) {
+          recognition.stop();
+        } else {
+          finalTranscript = '';
+          recognition.start();
+        }
+      });
+    } else {
+      // Hide mic button if not supported
+      micBtn.classList.add('unsupported');
+    }
 
     // Init - wake up sprite first, then load sessions
     async function init() {

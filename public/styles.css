@@ -654,6 +654,37 @@
     #attach-btn:active { background: var(--bg-tertiary); }
     #attach-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* Mic button */
+    #mic-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    #mic-btn:active { background: var(--bg-tertiary); }
+    #mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #mic-btn.recording {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      color: #ef4444;
+      animation: pulse-recording 1.5s ease-in-out infinite;
+    }
+    #mic-btn.unsupported { display: none; }
+
+    @keyframes pulse-recording {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+
     /* Image preview */
     #image-preview {
       display: none;
