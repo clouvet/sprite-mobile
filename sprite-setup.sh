@@ -23,7 +23,6 @@ GIT_USER_NAME="${GIT_USER_NAME:-}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-}"
 SPRITE_MOBILE_REPO="${SPRITE_MOBILE_REPO:-https://github.com/superfly/sprite-mobile}"
 SPRITE_PUBLIC_URL="${SPRITE_PUBLIC_URL:-}"
-TTYD_PORT="${TTYD_PORT:-8181}"
 APP_PORT="${APP_PORT:-8081}"
 WAKEUP_PORT="${WAKEUP_PORT:-8080}"
 
@@ -381,33 +380,9 @@ step_7_tailscale() {
     echo "Tailscale IP: $TAILSCALE_IP"
 }
 
-step_8_ttyd() {
+step_8_sprite_mobile() {
     echo ""
-    echo "=== Step 8: ttyd Installation ==="
-
-    if command -v ttyd &>/dev/null; then
-        echo "ttyd already installed"
-    else
-        echo "Installing ttyd..."
-        sudo apt-get update
-        sudo apt-get install -y ttyd
-    fi
-
-    # Check if ttyd service is running
-    if sprite_api /v1/services 2>/dev/null | grep -q '"ttyd"'; then
-        echo "ttyd service already running"
-    else
-        echo "Starting ttyd service on port $TTYD_PORT..."
-        sprite_api -X PUT '/v1/services/ttyd?duration=3s' -d "{
-          \"cmd\": \"ttyd\",
-          \"args\": [\"-W\", \"-p\", \"$TTYD_PORT\", \"-t\", \"fontSize=28\", \"zsh\"]
-        }"
-    fi
-}
-
-step_9_sprite_mobile() {
-    echo ""
-    echo "=== Step 9: sprite-mobile Setup ==="
+    echo "=== Step 8: sprite-mobile Setup ==="
 
     SPRITE_MOBILE_DIR="$HOME/.sprite-mobile"
 
@@ -444,9 +419,9 @@ step_9_sprite_mobile() {
     fi
 }
 
-step_10_tailscale_serve() {
+step_9_tailscale_serve() {
     echo ""
-    echo "=== Step 10: Tailscale Serve ==="
+    echo "=== Step 9: Tailscale Serve ==="
     echo "Exposing sprite-mobile via HTTPS on your tailnet (enables PWA/service worker)"
 
     # Check if already serving
@@ -493,9 +468,9 @@ step_10_tailscale_serve() {
     fi
 }
 
-step_11_tailnet_gate() {
+step_10_tailnet_gate() {
     echo ""
-    echo "=== Step 11: Tailnet Gate ==="
+    echo "=== Step 10: Tailnet Gate ==="
     echo "Public endpoint that redirects to Tailscale URL if on tailnet"
 
     GATE_DIR="$HOME/.tailnet-gate"
@@ -618,9 +593,9 @@ GATE_EOF
     }"
 }
 
-step_12_claude_md() {
+step_11_claude_md() {
     echo ""
-    echo "=== Step 12: CLAUDE.md Setup ==="
+    echo "=== Step 11: CLAUDE.md Setup ==="
 
     CLAUDE_MD_PATH="$HOME/CLAUDE.md"
 
@@ -669,7 +644,6 @@ This ensures only users on the tailnet can access the sprite without requiring p
 
 ### Other Services
 - `tailscaled` - Tailscale daemon
-- `ttyd` (port 8181) - Web terminal interface
 CLAUDE_EOF
 
     echo "Created $CLAUDE_MD_PATH"
@@ -687,7 +661,6 @@ show_summary() {
     echo "Services running:"
     echo "  - tailnet-gate (public): Port $WAKEUP_PORT - redirects to Tailscale URL"
     echo "  - sprite-mobile:         http://$TAILSCALE_IP:$APP_PORT (Tailscale HTTP)"
-    echo "  - ttyd (web terminal):   http://$TAILSCALE_IP:$TTYD_PORT (Tailscale HTTP)"
     echo ""
     if [ -n "$TAILSCALE_SERVE_URL" ]; then
         echo "Tailscale HTTPS (PWA-ready):"
@@ -720,7 +693,6 @@ STEP_NAMES=(
     "Sprites CLI"
     "Sprite Network (optional)"
     "Tailscale"
-    "ttyd (web terminal)"
     "sprite-mobile"
     "Tailscale Serve (HTTPS)"
     "Tailnet Gate"
@@ -738,11 +710,10 @@ run_step() {
         6) step_6_sprites ;;
         6.5) step_6_5_network ;;
         7) step_7_tailscale ;;
-        8) step_8_ttyd ;;
-        9) step_9_sprite_mobile ;;
-        10) step_10_tailscale_serve ;;
-        11) step_11_tailnet_gate ;;
-        12) step_12_claude_md ;;
+        8) step_8_sprite_mobile ;;
+        9) step_9_tailscale_serve ;;
+        10) step_10_tailnet_gate ;;
+        11) step_11_claude_md ;;
         *) echo "Unknown step: $step_num" >&2; return 1 ;;
     esac
 }
@@ -761,11 +732,10 @@ show_menu() {
     echo "   6.   Sprites CLI installation"
     echo "   6.5  Sprite Network (optional)"
     echo "   7.   Tailscale installation"
-    echo "   8.   ttyd (web terminal) installation"
-    echo "   9.   sprite-mobile setup"
-    echo "  10.   Tailscale Serve (HTTPS for PWA)"
-    echo "  11.   Tailnet Gate (public entry point)"
-    echo "  12.   CLAUDE.md creation"
+    echo "   8.   sprite-mobile setup"
+    echo "   9.   Tailscale Serve (HTTPS for PWA)"
+    echo "  10.   Tailnet Gate (public entry point)"
+    echo "  11.   CLAUDE.md creation"
     echo ""
     echo "Options:"
     echo "  all     - Run all steps sequentially"
@@ -803,11 +773,10 @@ run_all_steps() {
     step_6_sprites
     step_6_5_network
     step_7_tailscale
-    step_8_ttyd
-    step_9_sprite_mobile
-    step_10_tailscale_serve
-    step_11_tailnet_gate
-    step_12_claude_md
+    step_8_sprite_mobile
+    step_9_tailscale_serve
+    step_10_tailnet_gate
+    step_11_claude_md
     show_summary
 }
 
