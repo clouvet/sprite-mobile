@@ -925,6 +925,10 @@ This ensures only users on the tailnet can access the sprite without requiring p
 
 ### Other Services
 - `tailscaled` - Tailscale daemon
+
+## Git Commits
+
+Do NOT add "Co-Authored-By" lines to commit messages. Just write normal commit messages without any co-author attribution.
 CLAUDE_EOF
 
     echo "Created $CLAUDE_MD_PATH"
