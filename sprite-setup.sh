@@ -9,6 +9,10 @@ trap 'echo ""; echo "Aborted."; exit 130' INT
 # Run this once after creating a new sprite
 # ============================================
 
+# Non-interactive mode flag
+NON_INTERACTIVE="${NON_INTERACTIVE:-false}"
+CONFIG_FILE=""
+
 # Detect which sprite API command is available
 if command -v sprite-env &>/dev/null; then
     sprite_api() { sprite-env curl "$@"; }
@@ -25,6 +29,157 @@ SPRITE_MOBILE_REPO="${SPRITE_MOBILE_REPO:-https://github.com/superfly/sprite-mob
 SPRITE_PUBLIC_URL="${SPRITE_PUBLIC_URL:-}"
 APP_PORT="${APP_PORT:-8081}"
 WAKEUP_PORT="${WAKEUP_PORT:-8080}"
+TAILSCALE_AUTH_KEY="${TAILSCALE_AUTH_KEY:-}"
+
+# ============================================
+# JSON Helper Functions (no jq dependency)
+# ============================================
+
+# Extract a simple string value from JSON
+json_get() {
+    local json="$1"
+    local key="$2"
+    echo "$json" | grep -o "\"$key\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | sed 's/.*: *"\([^"]*\)".*/\1/' | head -1
+}
+
+# Extract a nested value like credentials.claude
+json_get_nested() {
+    local json="$1"
+    local parent="$2"
+    local key="$3"
+    # Find the parent object and extract the key
+    local section=$(echo "$json" | tr '\n' ' ' | grep -o "\"$parent\"[[:space:]]*:[[:space:]]*{[^}]*}" | head -1)
+    json_get "$section" "$key"
+}
+
+# ============================================
+# Export Configuration
+# ============================================
+
+export_config() {
+    echo "Exporting current sprite configuration..." >&2
+
+    # Gather current values
+    # NOTE: hostname and public_url are intentionally NOT exported
+    # as they are unique per sprite
+    local git_name=$(git config --global user.name 2>/dev/null || echo "")
+    local git_email=$(git config --global user.email 2>/dev/null || echo "")
+
+    # Read credential files and base64 encode
+    local claude_creds=""
+    if [ -f "$HOME/.claude/.credentials.json" ]; then
+        claude_creds=$(base64 -w0 "$HOME/.claude/.credentials.json" 2>/dev/null || base64 "$HOME/.claude/.credentials.json" | tr -d '\n')
+    fi
+
+    local github_creds=""
+    if [ -f "$HOME/.config/gh/hosts.yml" ]; then
+        github_creds=$(base64 -w0 "$HOME/.config/gh/hosts.yml" 2>/dev/null || base64 "$HOME/.config/gh/hosts.yml" | tr -d '\n')
+    fi
+
+    local flyctl_creds=""
+    if [ -f "$HOME/.fly/config.yml" ]; then
+        # Only export config files, not binaries
+        flyctl_creds=$(tar -czf - -C "$HOME/.fly" config.yml state.yml 2>/dev/null | base64 -w0 2>/dev/null || tar -czf - -C "$HOME/.fly" config.yml state.yml 2>/dev/null | base64 | tr -d '\n')
+    fi
+
+    local sprite_network_creds=""
+    if [ -f "$HOME/.sprite-network/credentials.json" ]; then
+        sprite_network_creds=$(base64 -w0 "$HOME/.sprite-network/credentials.json" 2>/dev/null || base64 "$HOME/.sprite-network/credentials.json" | tr -d '\n')
+    fi
+
+    # Read saved Tailscale reusable auth key if available
+    local tailscale_auth_key=""
+    if [ -f "$HOME/.sprite-mobile/.tailscale-auth-key" ]; then
+        tailscale_auth_key=$(cat "$HOME/.sprite-mobile/.tailscale-auth-key")
+    fi
+
+    # Output JSON
+    # NOTE: hostname and public_url are NOT included - they are unique per sprite
+    cat << EXPORT_EOF
+{
+  "git": {
+    "user_name": "$git_name",
+    "user_email": "$git_email"
+  },
+  "credentials": {
+    "claude": "$claude_creds",
+    "github": "$github_creds",
+    "flyctl": "$flyctl_creds",
+    "sprite_network": "$sprite_network_creds"
+  },
+  "tailscale": {
+    "auth_key": "$tailscale_auth_key"
+  },
+  "ports": {
+    "app": $APP_PORT,
+    "wakeup": $WAKEUP_PORT
+  },
+  "skip_steps": []
+}
+EXPORT_EOF
+}
+
+# ============================================
+# Load Configuration
+# ============================================
+
+load_config() {
+    local config_file="$1"
+
+    if [ ! -f "$config_file" ]; then
+        echo "Error: Config file not found: $config_file" >&2
+        exit 1
+    fi
+
+    echo "Loading configuration from: $config_file" >&2
+
+    local config=$(cat "$config_file")
+
+    # Load simple values
+    # NOTE: hostname and public_url are NOT loaded from config - they are unique per sprite
+    local cfg_git_name=$(json_get_nested "$config" "git" "user_name")
+    local cfg_git_email=$(json_get_nested "$config" "git" "user_email")
+    local cfg_tailscale_key=$(json_get_nested "$config" "tailscale" "auth_key")
+
+    # Set global variables (hostname/public_url not set - unique per sprite)
+    [ -n "$cfg_git_name" ] && GIT_USER_NAME="$cfg_git_name"
+    [ -n "$cfg_git_email" ] && GIT_USER_EMAIL="$cfg_git_email"
+    [ -n "$cfg_tailscale_key" ] && TAILSCALE_AUTH_KEY="$cfg_tailscale_key"
+
+    # Extract and install credentials
+    local claude_creds=$(json_get_nested "$config" "credentials" "claude")
+    if [ -n "$claude_creds" ]; then
+        echo "  Installing Claude credentials..." >&2
+        mkdir -p "$HOME/.claude"
+        echo "$claude_creds" | base64 -d > "$HOME/.claude/.credentials.json"
+        chmod 600 "$HOME/.claude/.credentials.json"
+    fi
+
+    local github_creds=$(json_get_nested "$config" "credentials" "github")
+    if [ -n "$github_creds" ]; then
+        echo "  Installing GitHub credentials..." >&2
+        mkdir -p "$HOME/.config/gh"
+        echo "$github_creds" | base64 -d > "$HOME/.config/gh/hosts.yml"
+        chmod 600 "$HOME/.config/gh/hosts.yml"
+    fi
+
+    local flyctl_creds=$(json_get_nested "$config" "credentials" "flyctl")
+    if [ -n "$flyctl_creds" ]; then
+        echo "  Installing flyctl credentials..." >&2
+        mkdir -p "$HOME/.fly"
+        echo "$flyctl_creds" | base64 -d | tar -xzf - -C "$HOME/.fly" 2>/dev/null || true
+    fi
+
+    local sprite_network_creds=$(json_get_nested "$config" "credentials" "sprite_network")
+    if [ -n "$sprite_network_creds" ]; then
+        echo "  Installing sprite-network credentials..." >&2
+        mkdir -p "$HOME/.sprite-network"
+        echo "$sprite_network_creds" | base64 -d > "$HOME/.sprite-network/credentials.json"
+        chmod 600 "$HOME/.sprite-network/credentials.json"
+    fi
+
+    echo "Configuration loaded successfully" >&2
+}
 
 # ============================================
 # Step Functions
@@ -97,29 +252,39 @@ step_2_hostname() {
     echo ""
     echo "=== Step 2: Hostname and Git Configuration ==="
 
-    # Prompt for public URL and set hostname
-    read -p "Sprite public URL (optional) [$SPRITE_PUBLIC_URL]: " input_url
-    SPRITE_PUBLIC_URL="${input_url:-$SPRITE_PUBLIC_URL}"
+    # Prompt for public URL and set hostname (skip prompt in non-interactive mode)
+    if [ "$NON_INTERACTIVE" != "true" ]; then
+        read -p "Sprite public URL (optional) [$SPRITE_PUBLIC_URL]: " input_url
+        SPRITE_PUBLIC_URL="${input_url:-$SPRITE_PUBLIC_URL}"
+    fi
+
+    # Determine hostname: prefer SPRITE_NAME, then extract from URL
+    local target_hostname=""
+    if [ -n "$SPRITE_NAME" ]; then
+        target_hostname="$SPRITE_NAME"
+    elif [ -n "$SPRITE_PUBLIC_URL" ]; then
+        # Extract subdomain from URL (e.g., https://my-sprite.fly.dev -> my-sprite)
+        target_hostname=$(echo "$SPRITE_PUBLIC_URL" | sed -E 's|^https?://||' | cut -d'.' -f1)
+    fi
+
+    if [ -n "$target_hostname" ]; then
+        CURRENT_HOSTNAME=$(hostname)
+        if [ "$CURRENT_HOSTNAME" = "$target_hostname" ]; then
+            echo "Hostname already set to: $target_hostname"
+        else
+            echo "Setting hostname to: $target_hostname"
+            echo "$target_hostname" | sudo tee /etc/hostname > /dev/null
+            sudo hostname "$target_hostname"
+            # Add to /etc/hosts so sudo can resolve it
+            if ! grep -q "127.0.0.1.*$target_hostname" /etc/hosts 2>/dev/null; then
+                echo "127.0.0.1 $target_hostname" | sudo tee -a /etc/hosts > /dev/null
+                echo "  Added $target_hostname to /etc/hosts"
+            fi
+            echo "Hostname changed from '$CURRENT_HOSTNAME' to '$target_hostname'"
+        fi
+    fi
 
     if [ -n "$SPRITE_PUBLIC_URL" ]; then
-        # Extract subdomain from URL (e.g., https://my-sprite.fly.dev -> my-sprite)
-        SUBDOMAIN=$(echo "$SPRITE_PUBLIC_URL" | sed -E 's|^https?://||' | cut -d'.' -f1)
-        if [ -n "$SUBDOMAIN" ]; then
-            CURRENT_HOSTNAME=$(hostname)
-            if [ "$CURRENT_HOSTNAME" = "$SUBDOMAIN" ]; then
-                echo "Hostname already set to: $SUBDOMAIN"
-            else
-                echo "Setting hostname to: $SUBDOMAIN"
-                echo "$SUBDOMAIN" | sudo tee /etc/hostname > /dev/null
-                sudo hostname "$SUBDOMAIN"
-                # Add to /etc/hosts so sudo can resolve it
-                if ! grep -q "127.0.0.1.*$SUBDOMAIN" /etc/hosts 2>/dev/null; then
-                    echo "127.0.0.1 $SUBDOMAIN" | sudo tee -a /etc/hosts > /dev/null
-                    echo "  Added $SUBDOMAIN to /etc/hosts"
-                fi
-                echo "Hostname changed from '$CURRENT_HOSTNAME' to '$SUBDOMAIN'"
-            fi
-        fi
 
         # Add to ~/.zshrc for CLI access
         echo "Adding SPRITE_PUBLIC_URL to ~/.zshrc..."
@@ -140,7 +305,20 @@ step_2_hostname() {
     CURRENT_GIT_NAME=$(git config --global user.name 2>/dev/null || echo "")
     CURRENT_GIT_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
 
-    if [ -n "$CURRENT_GIT_NAME" ] && [ -n "$CURRENT_GIT_EMAIL" ]; then
+    if [ "$NON_INTERACTIVE" = "true" ]; then
+        # Non-interactive: use provided values or keep existing
+        if [ -n "$GIT_USER_NAME" ]; then
+            git config --global user.name "$GIT_USER_NAME"
+            echo "Set git user.name: $GIT_USER_NAME"
+        fi
+        if [ -n "$GIT_USER_EMAIL" ]; then
+            git config --global user.email "$GIT_USER_EMAIL"
+            echo "Set git user.email: $GIT_USER_EMAIL"
+        fi
+        if [ -z "$GIT_USER_NAME" ] && [ -z "$GIT_USER_EMAIL" ]; then
+            echo "Git configuration unchanged (no values provided)"
+        fi
+    elif [ -n "$CURRENT_GIT_NAME" ] && [ -n "$CURRENT_GIT_EMAIL" ]; then
         echo "Git already configured:"
         echo "  user.name: $CURRENT_GIT_NAME"
         echo "  user.email: $CURRENT_GIT_EMAIL"
@@ -173,6 +351,13 @@ step_3_claude() {
 
     if claude auth status &>/dev/null; then
         echo "Claude CLI already authenticated, skipping..."
+    elif [ "$NON_INTERACTIVE" = "true" ]; then
+        if [ -f "$HOME/.claude/.credentials.json" ]; then
+            echo "Claude credentials file installed (will be validated on first use)"
+        else
+            echo "Warning: Claude not authenticated and no credentials provided"
+            echo "  Run interactively or provide credentials in config"
+        fi
     else
         echo "Starting Claude CLI authentication..."
         echo "Follow the prompts to authenticate:"
@@ -186,6 +371,18 @@ step_4_github() {
 
     if gh auth status &>/dev/null; then
         echo "GitHub CLI already authenticated, skipping..."
+    elif [ "$NON_INTERACTIVE" = "true" ]; then
+        if [ -f "$HOME/.config/gh/hosts.yml" ]; then
+            echo "GitHub credentials file installed (verifying...)"
+            if gh auth status &>/dev/null; then
+                echo "GitHub CLI authenticated successfully"
+            else
+                echo "Warning: GitHub credentials installed but validation failed"
+            fi
+        else
+            echo "Warning: GitHub not authenticated and no credentials provided"
+            echo "  Run interactively or provide credentials in config"
+        fi
     else
         echo "Starting GitHub CLI authentication..."
         echo "Follow the prompts to authenticate:"
@@ -211,6 +408,18 @@ step_5_flyctl() {
     # Authenticate Fly.io if not already logged in
     if flyctl auth whoami &>/dev/null; then
         echo "Fly.io already authenticated"
+    elif [ "$NON_INTERACTIVE" = "true" ]; then
+        if [ -d "$HOME/.fly" ]; then
+            echo "Fly.io credentials installed (verifying...)"
+            if flyctl auth whoami &>/dev/null; then
+                echo "Fly.io authenticated successfully"
+            else
+                echo "Warning: Fly.io credentials installed but validation failed"
+            fi
+        else
+            echo "Warning: Fly.io not authenticated and no credentials provided"
+            echo "  Run interactively or provide credentials in config"
+        fi
     else
         echo "Authenticating Fly.io..."
         echo "Follow the prompts to authenticate:"
@@ -237,6 +446,9 @@ step_6_sprites() {
     # Authenticate Sprites CLI and org
     if [ -d "$HOME/.sprite" ]; then
         echo "Sprites CLI already authenticated"
+    elif [ "$NON_INTERACTIVE" = "true" ]; then
+        echo "Warning: Sprites CLI not authenticated"
+        echo "  Run interactively to authenticate"
     else
         echo "Logging in to Sprites CLI..."
         echo "Follow the prompts to authenticate:"
@@ -247,50 +459,58 @@ step_6_sprites() {
 step_6_5_network() {
     echo ""
     echo "=== Step 6.5: Sprite Network (Optional) ==="
-    echo "Sprite Network enables automatic discovery of other sprites in your organization."
-    echo "It uses a shared Tigris S3 bucket to register and discover sprites."
-    echo ""
 
     SPRITE_NETWORK_DIR="$HOME/.sprite-network"
     SPRITE_NETWORK_CREDS="$SPRITE_NETWORK_DIR/credentials.json"
 
     if [ -f "$SPRITE_NETWORK_CREDS" ]; then
         echo "Sprite network credentials already configured"
-    else
-        read -p "Set up Sprite Network? [y/N]: " setup_network
-        if [ "$setup_network" = "y" ] || [ "$setup_network" = "Y" ]; then
-            echo ""
-            echo "Options:"
-            echo "  1) Create new Tigris bucket (requires flyctl)"
-            echo "  2) Enter existing credentials"
-            echo "  3) Skip"
-            read -p "Choice [1/2/3]: " network_choice
+        return
+    fi
 
-            case "$network_choice" in
-                1)
-                    if ! command -v flyctl &>/dev/null; then
-                        echo "flyctl not found. Please install it first or use option 2."
-                    else
-                        read -p "Fly.io org name: " FLY_ORG
-                        BUCKET_NAME="sprite-network-${FLY_ORG}"
-                        echo "Creating Tigris bucket: $BUCKET_NAME"
+    if [ "$NON_INTERACTIVE" = "true" ]; then
+        echo "Skipping Sprite Network setup (non-interactive, no credentials provided)"
+        return
+    fi
 
-                        # Create the bucket
-                        if flyctl storage create -o "$FLY_ORG" -n "$BUCKET_NAME" --public; then
-                            echo "Bucket created successfully"
+    echo "Sprite Network enables automatic discovery of other sprites in your organization."
+    echo "It uses a shared Tigris S3 bucket to register and discover sprites."
+    echo ""
 
-                            # Get credentials
-                            echo "Fetching credentials..."
-                            CREDS_OUTPUT=$(flyctl storage dashboard -o "$FLY_ORG" "$BUCKET_NAME" --json 2>/dev/null || echo "{}")
+    read -p "Set up Sprite Network? [y/N]: " setup_network
+    if [ "$setup_network" = "y" ] || [ "$setup_network" = "Y" ]; then
+        echo ""
+        echo "Options:"
+        echo "  1) Create new Tigris bucket (requires flyctl)"
+        echo "  2) Enter existing credentials"
+        echo "  3) Skip"
+        read -p "Choice [1/2/3]: " network_choice
 
-                            if echo "$CREDS_OUTPUT" | grep -q "AWS_ACCESS_KEY_ID"; then
-                                mkdir -p "$SPRITE_NETWORK_DIR"
-                                # Extract credentials from flyctl output
-                                AWS_ACCESS_KEY_ID=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_ACCESS_KEY_ID":"[^"]*"' | cut -d'"' -f4)
-                                AWS_SECRET_ACCESS_KEY=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_SECRET_ACCESS_KEY":"[^"]*"' | cut -d'"' -f4)
-                                AWS_ENDPOINT_URL_S3=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_ENDPOINT_URL_S3":"[^"]*"' | cut -d'"' -f4)
+        case "$network_choice" in
+            1)
+                if ! command -v flyctl &>/dev/null; then
+                    echo "flyctl not found. Please install it first or use option 2."
+                else
+                    read -p "Fly.io org name: " FLY_ORG
+                    BUCKET_NAME="sprite-network-${FLY_ORG}"
+                    echo "Creating Tigris bucket: $BUCKET_NAME"
 
-                                cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
+                    # Create the bucket
+                    if flyctl storage create -o "$FLY_ORG" -n "$BUCKET_NAME" --public; then
+                        echo "Bucket created successfully"
+
+                        # Get credentials
+                        echo "Fetching credentials..."
+                        CREDS_OUTPUT=$(flyctl storage dashboard -o "$FLY_ORG" "$BUCKET_NAME" --json 2>/dev/null || echo "{}")
+
+                        if echo "$CREDS_OUTPUT" | grep -q "AWS_ACCESS_KEY_ID"; then
+                            mkdir -p "$SPRITE_NETWORK_DIR"
+                            # Extract credentials from flyctl output
+                            AWS_ACCESS_KEY_ID=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_ACCESS_KEY_ID":"[^"]*"' | cut -d'"' -f4)
+                            AWS_SECRET_ACCESS_KEY=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_SECRET_ACCESS_KEY":"[^"]*"' | cut -d'"' -f4)
+                            AWS_ENDPOINT_URL_S3=$(echo "$CREDS_OUTPUT" | grep -o '"AWS_ENDPOINT_URL_S3":"[^"]*"' | cut -d'"' -f4)
+
+                            cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
 {
   "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
   "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
@@ -299,30 +519,30 @@ step_6_5_network() {
   "ORG": "$FLY_ORG"
 }
 CREDS_EOF
-                                chmod 600 "$SPRITE_NETWORK_CREDS"
-                                echo "Credentials saved to $SPRITE_NETWORK_CREDS"
-                            else
-                                echo "Could not fetch credentials automatically."
-                                echo "Run: flyctl storage dashboard -o $FLY_ORG $BUCKET_NAME"
-                                echo "Then use option 2 to enter credentials manually."
-                            fi
+                            chmod 600 "$SPRITE_NETWORK_CREDS"
+                            echo "Credentials saved to $SPRITE_NETWORK_CREDS"
                         else
-                            echo "Failed to create bucket. It may already exist - try option 2."
+                            echo "Could not fetch credentials automatically."
+                            echo "Run: flyctl storage dashboard -o $FLY_ORG $BUCKET_NAME"
+                            echo "Then use option 2 to enter credentials manually."
                         fi
+                    else
+                        echo "Failed to create bucket. It may already exist - try option 2."
                     fi
-                    ;;
-                2)
-                    echo ""
-                    echo "Enter Tigris bucket credentials:"
-                    read -p "AWS_ACCESS_KEY_ID: " AWS_ACCESS_KEY_ID
-                    read -p "AWS_SECRET_ACCESS_KEY: " AWS_SECRET_ACCESS_KEY
-                    read -p "BUCKET_NAME: " BUCKET_NAME
-                    read -p "AWS_ENDPOINT_URL_S3 [https://fly.storage.tigris.dev]: " AWS_ENDPOINT_URL_S3
-                    AWS_ENDPOINT_URL_S3="${AWS_ENDPOINT_URL_S3:-https://fly.storage.tigris.dev}"
-                    read -p "ORG (Fly.io org name): " FLY_ORG
+                fi
+                ;;
+            2)
+                echo ""
+                echo "Enter Tigris bucket credentials:"
+                read -p "AWS_ACCESS_KEY_ID: " AWS_ACCESS_KEY_ID
+                read -p "AWS_SECRET_ACCESS_KEY: " AWS_SECRET_ACCESS_KEY
+                read -p "BUCKET_NAME: " BUCKET_NAME
+                read -p "AWS_ENDPOINT_URL_S3 [https://fly.storage.tigris.dev]: " AWS_ENDPOINT_URL_S3
+                AWS_ENDPOINT_URL_S3="${AWS_ENDPOINT_URL_S3:-https://fly.storage.tigris.dev}"
+                read -p "ORG (Fly.io org name): " FLY_ORG
 
-                    mkdir -p "$SPRITE_NETWORK_DIR"
-                    cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
+                mkdir -p "$SPRITE_NETWORK_DIR"
+                cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
 {
   "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
   "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
@@ -331,22 +551,23 @@ CREDS_EOF
   "ORG": "$FLY_ORG"
 }
 CREDS_EOF
-                    chmod 600 "$SPRITE_NETWORK_CREDS"
-                    echo "Credentials saved to $SPRITE_NETWORK_CREDS"
-                    ;;
-                *)
-                    echo "Skipping Sprite Network setup"
-                    ;;
-            esac
-        else
-            echo "Skipping Sprite Network setup"
-        fi
+                chmod 600 "$SPRITE_NETWORK_CREDS"
+                echo "Credentials saved to $SPRITE_NETWORK_CREDS"
+                ;;
+            *)
+                echo "Skipping Sprite Network setup"
+                ;;
+        esac
+    else
+        echo "Skipping Sprite Network setup"
     fi
 }
 
 step_7_tailscale() {
     echo ""
     echo "=== Step 7: Tailscale Installation ==="
+
+    TAILSCALE_AUTH_KEY_FILE="$HOME/.sprite-mobile/.tailscale-auth-key"
 
     if command -v tailscale &>/dev/null; then
         echo "Tailscale already installed"
@@ -367,17 +588,77 @@ step_7_tailscale() {
         sleep 3
     fi
 
+    # Load saved auth key if available and not already set
+    if [ -z "$TAILSCALE_AUTH_KEY" ] && [ -f "$TAILSCALE_AUTH_KEY_FILE" ]; then
+        TAILSCALE_AUTH_KEY=$(cat "$TAILSCALE_AUTH_KEY_FILE")
+    fi
+
     # Authenticate Tailscale if not already connected
     if tailscale status &>/dev/null; then
         echo "Tailscale already connected"
+    elif [ "$NON_INTERACTIVE" = "true" ]; then
+        if [ -n "$TAILSCALE_AUTH_KEY" ]; then
+            echo "Authenticating Tailscale with auth key..."
+            sudo tailscale up --authkey="$TAILSCALE_AUTH_KEY"
+        else
+            echo "Warning: Tailscale not connected and no auth key provided"
+            echo "  Tailscale requires interactive authentication or an auth key"
+            echo "  Generate a reusable auth key at: https://login.tailscale.com/admin/settings/keys"
+            echo "  Then add it to your config as tailscale.auth_key"
+            return
+        fi
     else
-        echo "Authenticating Tailscale..."
-        echo "Visit the URL shown to add this sprite to your tailnet:"
-        sudo tailscale up
+        # Interactive mode - ask about reusable auth key for future automation
+        echo ""
+        echo "Tailscale authentication options:"
+        echo "  1) Interactive login (opens browser URL)"
+        echo "  2) Use a reusable auth key (enables automated setup of future sprites)"
+        echo ""
+        read -p "Choice [1/2]: " ts_choice
+
+        if [ "$ts_choice" = "2" ]; then
+            echo ""
+            echo "To create a reusable auth key:"
+            echo "  1. Go to: https://login.tailscale.com/admin/settings/keys"
+            echo "  2. Click 'Generate auth key'"
+            echo "  3. Check 'Reusable' (important for automating multiple sprites)"
+            echo "  4. Optionally set expiry and tags"
+            echo "  5. Copy the generated key"
+            echo ""
+            read -p "Paste your reusable auth key: " input_key
+
+            if [ -n "$input_key" ]; then
+                TAILSCALE_AUTH_KEY="$input_key"
+                # Save for future exports
+                mkdir -p "$(dirname "$TAILSCALE_AUTH_KEY_FILE")"
+                echo "$TAILSCALE_AUTH_KEY" > "$TAILSCALE_AUTH_KEY_FILE"
+                chmod 600 "$TAILSCALE_AUTH_KEY_FILE"
+                echo "Auth key saved for future sprite setups"
+                echo ""
+                echo "Authenticating Tailscale with auth key..."
+                sudo tailscale up --authkey="$TAILSCALE_AUTH_KEY"
+            else
+                echo "No key provided, falling back to interactive login..."
+                sudo tailscale up
+            fi
+        else
+            echo "Authenticating Tailscale..."
+            echo "Visit the URL shown to add this sprite to your tailnet:"
+            sudo tailscale up
+        fi
     fi
 
-    TAILSCALE_IP=$(tailscale ip -4)
-    echo "Tailscale IP: $TAILSCALE_IP"
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+    if [ -n "$TAILSCALE_IP" ]; then
+        echo "Tailscale IP: $TAILSCALE_IP"
+    fi
+
+    # Save auth key if provided via config (for future exports)
+    if [ -n "$TAILSCALE_AUTH_KEY" ] && [ ! -f "$TAILSCALE_AUTH_KEY_FILE" ]; then
+        mkdir -p "$(dirname "$TAILSCALE_AUTH_KEY_FILE")"
+        echo "$TAILSCALE_AUTH_KEY" > "$TAILSCALE_AUTH_KEY_FILE"
+        chmod 600 "$TAILSCALE_AUTH_KEY_FILE"
+    fi
 }
 
 step_8_sprite_mobile() {
@@ -784,20 +1065,109 @@ run_all_steps() {
 # Main Entry Point
 # ============================================
 
+show_help() {
+    show_menu
+    echo "Usage: $0 [OPTIONS] [all | step numbers]"
+    echo ""
+    echo "Options:"
+    echo "  --export              Export current sprite config as JSON (to stdout)"
+    echo "  --config <file>       Run non-interactively using config file"
+    echo "  --config -            Read config from stdin"
+    echo "  --name <name>         Set sprite name/hostname (for new sprite setup)"
+    echo "  --url <url>           Set sprite public URL (for new sprite setup)"
+    echo "  -h, --help            Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0 all                       # Run all steps interactively"
+    echo "  $0 1 3 5                     # Run steps 1, 3, and 5"
+    echo "  $0 8-11                      # Run steps 8 through 11"
+    echo "  $0 --export > config.json    # Export config to file"
+    echo "  $0 --config config.json all  # Run all steps non-interactively"
+    echo "  $0 --config config.json 1-8  # Run steps 1-8 non-interactively"
+    echo ""
+    echo "Orchestrating new sprites from an existing sprite:"
+    echo "  $0 --config config.json --name my-sprite --url https://my-sprite.fly.dev all"
+    echo ""
+    echo "Non-interactive mode:"
+    echo "  Use --export on a configured sprite to generate a config file,"
+    echo "  then use --config on a new sprite to apply the same configuration."
+    echo "  Use --name and --url to set the target sprite's identity."
+    echo "  Tailscale requires a reusable auth key for fully automated setup."
+    echo ""
+}
+
+# Parse arguments
+POSITIONAL_ARGS=()
+SPRITE_NAME=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --export)
+            export_config
+            exit 0
+            ;;
+        --config)
+            shift
+            if [ -z "$1" ]; then
+                echo "Error: --config requires a file path or '-' for stdin" >&2
+                exit 1
+            fi
+            if [ "$1" = "-" ]; then
+                # Read from stdin into temp file
+                CONFIG_FILE=$(mktemp)
+                cat > "$CONFIG_FILE"
+                trap "rm -f $CONFIG_FILE" EXIT
+            else
+                CONFIG_FILE="$1"
+            fi
+            NON_INTERACTIVE="true"
+            load_config "$CONFIG_FILE"
+            shift
+            ;;
+        --name)
+            shift
+            if [ -z "$1" ]; then
+                echo "Error: --name requires a sprite name" >&2
+                exit 1
+            fi
+            SPRITE_NAME="$1"
+            shift
+            ;;
+        --url)
+            shift
+            if [ -z "$1" ]; then
+                echo "Error: --url requires a URL" >&2
+                exit 1
+            fi
+            SPRITE_PUBLIC_URL="$1"
+            shift
+            ;;
+        -h|--help|help)
+            show_help
+            exit 0
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# If --name provided, derive URL if not explicitly set
+if [ -n "$SPRITE_NAME" ]; then
+    # Default URL pattern for sprites.app
+    if [ -z "$SPRITE_PUBLIC_URL" ]; then
+        SPRITE_PUBLIC_URL="https://${SPRITE_NAME}.fly.dev"
+        echo "Derived public URL: $SPRITE_PUBLIC_URL" >&2
+    fi
+fi
+
+# Restore positional args
+set -- "${POSITIONAL_ARGS[@]}"
+
 # If arguments provided, use them directly
 if [ $# -gt 0 ]; then
     if [ "$1" = "all" ] || [ "$1" = "--all" ] || [ "$1" = "-a" ]; then
         run_all_steps
-    elif [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ "$1" = "help" ]; then
-        show_menu
-        echo "Usage: $0 [all | step numbers | -h]"
-        echo ""
-        echo "Examples:"
-        echo "  $0 all        # Run all steps"
-        echo "  $0 1 3 5      # Run steps 1, 3, and 5"
-        echo "  $0 8-12       # Run steps 8 through 12"
-        echo "  $0            # Interactive mode"
-        exit 0
     else
         # Run specified steps
         steps=$(parse_step_range "$*")
