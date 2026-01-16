@@ -130,7 +130,193 @@ EXPORT_EOF
 }
 
 # ============================================
-# Load Configuration
+# Paste Configuration (interactive token input)
+# ============================================
+
+SPRITE_CONFIG_FILE="$HOME/.sprite-config"
+
+# Parse pasted config (env-var style: KEY=value)
+parse_pasted_config() {
+    local config="$1"
+
+    while IFS= read -r line; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+        # Parse KEY=value (handle values with = in them)
+        if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            local key="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+            # Remove surrounding quotes if present
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+
+            case "$key" in
+                GH_TOKEN)
+                    export GH_TOKEN="$value"
+                    echo "  GH_TOKEN: [set]"
+                    ;;
+                CLAUDE_OAUTH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN)
+                    export CLAUDE_CODE_OAUTH_TOKEN="$value"
+                    echo "  CLAUDE_CODE_OAUTH_TOKEN: [set]"
+                    ;;
+                ANTHROPIC_API_KEY)
+                    export ANTHROPIC_API_KEY="$value"
+                    echo "  ANTHROPIC_API_KEY: [set]"
+                    ;;
+                TAILSCALE_AUTH_KEY)
+                    export TAILSCALE_AUTH_KEY="$value"
+                    echo "  TAILSCALE_AUTH_KEY: [set]"
+                    ;;
+                GIT_USER_NAME)
+                    GIT_USER_NAME="$value"
+                    echo "  GIT_USER_NAME: $value"
+                    ;;
+                GIT_USER_EMAIL)
+                    GIT_USER_EMAIL="$value"
+                    echo "  GIT_USER_EMAIL: $value"
+                    ;;
+                SPRITE_MOBILE_REPO)
+                    SPRITE_MOBILE_REPO="$value"
+                    echo "  SPRITE_MOBILE_REPO: $value"
+                    ;;
+                # Sprite network S3 credentials
+                SPRITE_NETWORK_S3_BUCKET|BUCKET_NAME)
+                    export SPRITE_NETWORK_S3_BUCKET="$value"
+                    echo "  SPRITE_NETWORK_S3_BUCKET: [set]"
+                    ;;
+                SPRITE_NETWORK_S3_ACCESS_KEY|AWS_ACCESS_KEY_ID)
+                    export SPRITE_NETWORK_S3_ACCESS_KEY="$value"
+                    echo "  SPRITE_NETWORK_S3_ACCESS_KEY: [set]"
+                    ;;
+                SPRITE_NETWORK_S3_SECRET_KEY|AWS_SECRET_ACCESS_KEY)
+                    export SPRITE_NETWORK_S3_SECRET_KEY="$value"
+                    echo "  SPRITE_NETWORK_S3_SECRET_KEY: [set]"
+                    ;;
+                SPRITE_NETWORK_S3_ENDPOINT|AWS_ENDPOINT_URL_S3)
+                    export SPRITE_NETWORK_S3_ENDPOINT="$value"
+                    echo "  SPRITE_NETWORK_S3_ENDPOINT: [set]"
+                    ;;
+                SPRITE_NETWORK_ORG|ORG)
+                    export SPRITE_NETWORK_ORG="$value"
+                    echo "  SPRITE_NETWORK_ORG: $value"
+                    ;;
+                *)
+                    # Unknown key, export anyway
+                    export "$key"="$value"
+                    echo "  $key: [set]"
+                    ;;
+            esac
+        fi
+    done <<< "$config"
+}
+
+# Save current config (tokens only, no sprite-specific values)
+save_config() {
+    echo "Saving reusable config to $SPRITE_CONFIG_FILE..."
+
+    cat > "$SPRITE_CONFIG_FILE" << EOF
+# Sprite Config - reusable across sprites
+# Generated: $(date -Iseconds)
+# NOTE: SPRITE_PUBLIC_URL is intentionally omitted (unique per sprite)
+
+# Git configuration
+GIT_USER_NAME=$GIT_USER_NAME
+GIT_USER_EMAIL=$GIT_USER_EMAIL
+
+# Repository
+SPRITE_MOBILE_REPO=$SPRITE_MOBILE_REPO
+
+# Authentication tokens
+EOF
+
+    [ -n "$GH_TOKEN" ] && echo "GH_TOKEN=$GH_TOKEN" >> "$SPRITE_CONFIG_FILE"
+    [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && echo "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN" >> "$SPRITE_CONFIG_FILE"
+    [ -n "$ANTHROPIC_API_KEY" ] && echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" >> "$SPRITE_CONFIG_FILE"
+    [ -n "$TAILSCALE_AUTH_KEY" ] && echo "TAILSCALE_AUTH_KEY=$TAILSCALE_AUTH_KEY" >> "$SPRITE_CONFIG_FILE"
+
+    # Sprite network credentials
+    if [ -n "$SPRITE_NETWORK_S3_BUCKET" ]; then
+        echo "" >> "$SPRITE_CONFIG_FILE"
+        echo "# Sprite Network" >> "$SPRITE_CONFIG_FILE"
+        echo "SPRITE_NETWORK_S3_BUCKET=$SPRITE_NETWORK_S3_BUCKET" >> "$SPRITE_CONFIG_FILE"
+        [ -n "$SPRITE_NETWORK_S3_ACCESS_KEY" ] && echo "SPRITE_NETWORK_S3_ACCESS_KEY=$SPRITE_NETWORK_S3_ACCESS_KEY" >> "$SPRITE_CONFIG_FILE"
+        [ -n "$SPRITE_NETWORK_S3_SECRET_KEY" ] && echo "SPRITE_NETWORK_S3_SECRET_KEY=$SPRITE_NETWORK_S3_SECRET_KEY" >> "$SPRITE_CONFIG_FILE"
+        [ -n "$SPRITE_NETWORK_S3_ENDPOINT" ] && echo "SPRITE_NETWORK_S3_ENDPOINT=$SPRITE_NETWORK_S3_ENDPOINT" >> "$SPRITE_CONFIG_FILE"
+        [ -n "$SPRITE_NETWORK_ORG" ] && echo "SPRITE_NETWORK_ORG=$SPRITE_NETWORK_ORG" >> "$SPRITE_CONFIG_FILE"
+    fi
+
+    chmod 600 "$SPRITE_CONFIG_FILE"
+    echo "Config saved to $SPRITE_CONFIG_FILE"
+}
+
+# Prompt user to paste config or load from file
+prompt_for_config() {
+    echo ""
+    echo "============================================"
+    echo "Quick Config (optional)"
+    echo "============================================"
+    echo ""
+
+    # Check for saved config file
+    if [ -f "$SPRITE_CONFIG_FILE" ]; then
+        echo "Found saved config at $SPRITE_CONFIG_FILE"
+        read -p "Use saved config? [Y/n]: " use_saved
+        if [ "$use_saved" != "n" ] && [ "$use_saved" != "N" ]; then
+            echo ""
+            echo "Loading saved config..."
+            parse_pasted_config "$(cat "$SPRITE_CONFIG_FILE")"
+            echo ""
+            return
+        fi
+    fi
+
+    echo "Paste your config below to pre-fill values."
+    echo "Any missing values will be prompted interactively."
+    echo ""
+    echo "Example format:"
+    echo "  GH_TOKEN=ghp_xxx"
+    echo "  CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-xxx"
+    echo "  TAILSCALE_AUTH_KEY=tskey-auth-xxx"
+    echo "  GIT_USER_NAME=Your Name"
+    echo "  GIT_USER_EMAIL=you@example.com"
+    echo ""
+    echo "Press Enter twice when done, or just Enter to skip:"
+    echo ""
+
+    local config=""
+    local empty_lines=0
+
+    while IFS= read -r line; do
+        if [ -z "$line" ]; then
+            empty_lines=$((empty_lines + 1))
+            if [ $empty_lines -ge 1 ]; then
+                break
+            fi
+        else
+            empty_lines=0
+            config+="$line"$'\n'
+        fi
+    done
+
+    if [ -n "$config" ]; then
+        echo ""
+        echo "Parsing config..."
+        parse_pasted_config "$config"
+        echo ""
+
+        # Offer to save for future use
+        read -p "Save this config for future sprites? [y/N]: " save_config_choice
+        if [ "$save_config_choice" = "y" ] || [ "$save_config_choice" = "Y" ]; then
+            save_config
+        fi
+    fi
+}
+
+# ============================================
+# Load Configuration (JSON format, for --config)
 # ============================================
 
 load_config() {
@@ -257,7 +443,14 @@ step_2_configuration() {
     CURRENT_GIT_NAME=$(git config --global user.name 2>/dev/null || echo "")
     CURRENT_GIT_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
 
-    if [ "$NON_INTERACTIVE" = "true" ]; then
+    # If git config provided via paste and not already set
+    if [ -n "$GIT_USER_NAME" ] && [ -n "$GIT_USER_EMAIL" ] && \
+       [ "$GIT_USER_NAME" != "$CURRENT_GIT_NAME" -o "$GIT_USER_EMAIL" != "$CURRENT_GIT_EMAIL" ]; then
+        git config --global user.name "$GIT_USER_NAME"
+        git config --global user.email "$GIT_USER_EMAIL"
+        echo "Set git user.name: $GIT_USER_NAME"
+        echo "Set git user.email: $GIT_USER_EMAIL"
+    elif [ "$NON_INTERACTIVE" = "true" ]; then
         # Non-interactive: use provided values or keep existing
         if [ -n "$GIT_USER_NAME" ]; then
             git config --global user.name "$GIT_USER_NAME"
@@ -325,19 +518,24 @@ step_3_claude() {
         fi
 
         echo "Token saved to $CLAUDE_TOKEN_FILE (sourced from ~/.zshrc)"
+
+        # Source immediately so token is available for sprite-mobile startup
+        source "$CLAUDE_TOKEN_FILE"
     }
 
     if claude auth status &>/dev/null; then
         echo "Claude CLI already authenticated, skipping..."
+    elif [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+        # Token provided via config paste or environment
+        echo "Claude OAuth token provided, saving..."
+        save_claude_token "oauth" "$CLAUDE_CODE_OAUTH_TOKEN"
+    elif [ -n "$ANTHROPIC_API_KEY" ]; then
+        # API key provided via config paste or environment
+        echo "Anthropic API key provided, saving..."
+        echo "  Note: This uses API billing, not your subscription"
+        save_claude_token "apikey" "$ANTHROPIC_API_KEY"
     elif [ "$NON_INTERACTIVE" = "true" ]; then
-        if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-            echo "Claude OAuth token provided via environment"
-            save_claude_token "oauth" "$CLAUDE_CODE_OAUTH_TOKEN"
-        elif [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "Anthropic API key provided via environment"
-            echo "  Note: This uses API billing, not your subscription"
-            save_claude_token "apikey" "$ANTHROPIC_API_KEY"
-        elif [ -f "$HOME/.claude/.credentials.json" ]; then
+        if [ -f "$HOME/.claude/.credentials.json" ]; then
             echo "Claude credentials file installed (will be validated on first use)"
         else
             echo "Warning: Claude not authenticated and no credentials provided"
@@ -398,17 +596,19 @@ step_4_github() {
         # Ensure git credential helper is configured
         gh auth setup-git 2>/dev/null || true
         echo "Git credential helper configured"
+    elif [ -n "$GH_TOKEN" ]; then
+        # Token provided via config paste or environment
+        echo "GitHub token provided, authenticating..."
+        echo "$GH_TOKEN" | gh auth login --with-token
+        gh auth setup-git 2>/dev/null || true
+        if gh auth status &>/dev/null; then
+            echo "GitHub CLI authenticated successfully"
+            echo "Git credential helper configured"
+        else
+            echo "Warning: GitHub authentication failed with provided token"
+        fi
     elif [ "$NON_INTERACTIVE" = "true" ]; then
-        if [ -n "$GH_TOKEN" ]; then
-            echo "GitHub token provided via environment, authenticating..."
-            echo "$GH_TOKEN" | gh auth login --with-token
-            gh auth setup-git 2>/dev/null || true
-            if gh auth status &>/dev/null; then
-                echo "GitHub CLI authenticated successfully"
-            else
-                echo "Warning: GitHub authentication failed with provided token"
-            fi
-        elif [ -f "$HOME/.config/gh/hosts.yml" ]; then
+        if [ -f "$HOME/.config/gh/hosts.yml" ]; then
             echo "GitHub credentials file installed (verifying...)"
             # Setup git credential helper first
             gh auth setup-git 2>/dev/null || true
@@ -555,6 +755,24 @@ step_6_5_network() {
         return
     fi
 
+    # Check if credentials were provided via config paste or environment
+    if [ -n "$SPRITE_NETWORK_S3_BUCKET" ] && [ -n "$SPRITE_NETWORK_S3_ACCESS_KEY" ] && [ -n "$SPRITE_NETWORK_S3_SECRET_KEY" ]; then
+        echo "Sprite network credentials provided, saving..."
+        mkdir -p "$SPRITE_NETWORK_DIR"
+        cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
+{
+  "AWS_ACCESS_KEY_ID": "$SPRITE_NETWORK_S3_ACCESS_KEY",
+  "AWS_SECRET_ACCESS_KEY": "$SPRITE_NETWORK_S3_SECRET_KEY",
+  "AWS_ENDPOINT_URL_S3": "${SPRITE_NETWORK_S3_ENDPOINT:-https://fly.storage.tigris.dev}",
+  "BUCKET_NAME": "$SPRITE_NETWORK_S3_BUCKET",
+  "ORG": "${SPRITE_NETWORK_ORG:-}"
+}
+CREDS_EOF
+        chmod 600 "$SPRITE_NETWORK_CREDS"
+        echo "Credentials saved to $SPRITE_NETWORK_CREDS"
+        return
+    fi
+
     if [ "$NON_INTERACTIVE" = "true" ]; then
         echo "Skipping Sprite Network setup (non-interactive, no credentials provided)"
         return
@@ -686,17 +904,20 @@ step_7_tailscale() {
     # Authenticate Tailscale if not already connected
     if tailscale status &>/dev/null; then
         echo "Tailscale already connected"
+    elif [ -n "$TAILSCALE_AUTH_KEY" ]; then
+        # Auth key provided via config paste or environment
+        echo "Authenticating Tailscale with provided auth key..."
+        # Save for future exports
+        mkdir -p "$(dirname "$TAILSCALE_AUTH_KEY_FILE")"
+        echo "$TAILSCALE_AUTH_KEY" > "$TAILSCALE_AUTH_KEY_FILE"
+        chmod 600 "$TAILSCALE_AUTH_KEY_FILE"
+        sudo tailscale up --authkey="$TAILSCALE_AUTH_KEY"
     elif [ "$NON_INTERACTIVE" = "true" ]; then
-        if [ -n "$TAILSCALE_AUTH_KEY" ]; then
-            echo "Authenticating Tailscale with auth key..."
-            sudo tailscale up --authkey="$TAILSCALE_AUTH_KEY"
-        else
-            echo "Warning: Tailscale not connected and no auth key provided"
-            echo "  Tailscale requires interactive authentication or an auth key"
-            echo "  Generate a reusable auth key at: https://login.tailscale.com/admin/settings/keys"
-            echo "  Then add it to your config as tailscale.auth_key"
-            return
-        fi
+        echo "Warning: Tailscale not connected and no auth key provided"
+        echo "  Tailscale requires interactive authentication or an auth key"
+        echo "  Generate a reusable auth key at: https://login.tailscale.com/admin/settings/keys"
+        echo "  Then add it to your config as TAILSCALE_AUTH_KEY"
+        return
     else
         # Interactive mode - ask about reusable auth key for future automation
         echo ""
@@ -1204,6 +1425,11 @@ show_help() {
     echo "Example with tokens:"
     echo "  GH_TOKEN=ghp_xxx CLAUDE_CODE_OAUTH_TOKEN=xxx $0 3 4"
     echo ""
+    echo "Quick Config (interactive paste):"
+    echo "  When running interactively, you can paste a config after selecting steps."
+    echo "  See sprite-config.example for the format."
+    echo "  Pasted configs can be saved to ~/.sprite-config for reuse."
+    echo ""
 }
 
 # Parse arguments
@@ -1295,7 +1521,12 @@ read -p "Select steps (or 'all'): " selection
 if [ "$selection" = "q" ] || [ "$selection" = "quit" ]; then
     echo "Exiting."
     exit 0
-elif [ "$selection" = "all" ]; then
+fi
+
+# Prompt for config paste before running steps
+prompt_for_config
+
+if [ "$selection" = "all" ]; then
     run_all_steps
 else
     steps=$(parse_step_range "$selection")

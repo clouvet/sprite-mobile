@@ -1,0 +1,55 @@
+# Sprite Config Example
+# Copy this file and fill in your values, then paste during setup
+# or save as ~/.sprite-config for reuse across sprites
+#
+# During setup, after selecting steps, you'll be prompted to paste config.
+# Any values provided here will skip their interactive prompts.
+# Values you leave empty will still be prompted interactively.
+
+# Git configuration
+GIT_USER_NAME=Your Name
+GIT_USER_EMAIL=you@example.com
+
+# sprite-mobile repository (optional, defaults to clouvet/sprite-mobile)
+# SPRITE_MOBILE_REPO=https://github.com/your-org/sprite-mobile
+
+# ============================================
+# Authentication Tokens
+# ============================================
+
+# GitHub Personal Access Token
+# Create at: https://github.com/settings/tokens
+# Required scopes: repo, read:org, gist
+GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Claude Code OAuth Token (preserves Pro/Max subscription)
+# Generate with: claude setup-token (on a machine where you're logged in)
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# OR use an API key instead (uses direct API billing, not subscription)
+# ANTHROPIC_API_KEY=sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Tailscale Auth Key (enables automated setup)
+# Create at: https://login.tailscale.com/admin/settings/keys
+# Check "Reusable" to use for multiple sprites
+TAILSCALE_AUTH_KEY=tskey-auth-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# ============================================
+# Sprite Network (Optional)
+# For automatic sprite discovery across your organization
+# ============================================
+
+# Tigris S3 credentials (from flyctl storage dashboard)
+# SPRITE_NETWORK_S3_BUCKET=sprite-network-your-org
+# SPRITE_NETWORK_S3_ACCESS_KEY=tid_xxxxxxxxxxxxxxxxxxxx
+# SPRITE_NETWORK_S3_SECRET_KEY=tsec_xxxxxxxxxxxxxxxxxxxx
+# SPRITE_NETWORK_S3_ENDPOINT=https://fly.storage.tigris.dev
+# SPRITE_NETWORK_ORG=your-org
+
+# ============================================
+# Notes
+# ============================================
+# - SPRITE_PUBLIC_URL is intentionally omitted (unique per sprite)
+# - Save this file as ~/.sprite-config to reuse when setting up new sprites
+# - Lines starting with # are ignored
+# - Empty values or missing keys trigger interactive prompts
