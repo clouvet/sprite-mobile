@@ -1076,10 +1076,8 @@ step_8_sprite_mobile() {
         echo "  Created $SPRITE_MOBILE_DIR/.env"
     fi
 
-    # Source .zshrc to pick up any tokens added during setup
-    if [ -f "$HOME/.zshrc" ]; then
-        source "$HOME/.zshrc"
-    fi
+    # Tokens are already exported in current session by previous steps
+    # No need to source .zshrc (which contains zsh-specific commands that fail in bash)
 
     # Check if sprite-mobile service is running
     if sprite_api /v1/services 2>/dev/null | grep -q '"sprite-mobile"'; then
