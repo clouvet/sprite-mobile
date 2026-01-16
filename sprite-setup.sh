@@ -1132,15 +1132,8 @@ step_8_sprite_mobile() {
     cd "$SPRITE_MOBILE_DIR"
     bun install
 
-    # Write SPRITE_PUBLIC_URL to sprite-mobile/.env
-    if [ -n "$SPRITE_PUBLIC_URL" ]; then
-        echo "Writing SPRITE_PUBLIC_URL to sprite-mobile/.env..."
-        echo "SPRITE_PUBLIC_URL=$SPRITE_PUBLIC_URL" > "$SPRITE_MOBILE_DIR/.env"
-        echo "  Created $SPRITE_MOBILE_DIR/.env"
-    fi
-
-    # Tokens are already exported in current session by previous steps
-    # No need to source .zshrc (which contains zsh-specific commands that fail in bash)
+    # Environment variables are sourced from ~/.sprite-config via start-service.sh
+    # No need to write .env file
 
     # Check if sprite-mobile service is running
     if sprite_api /v1/services 2>/dev/null | grep -q '"sprite-mobile"'; then
@@ -1174,32 +1167,20 @@ step_9_tailscale_serve() {
     if [ -n "$TAILSCALE_SERVE_URL" ]; then
         echo "Tailscale HTTPS URL: $TAILSCALE_SERVE_URL"
 
-        # Save to ~/.sprite-config
+        # Save to ~/.sprite-config (sprite-mobile will read via start-service.sh)
         update_sprite_config "TAILSCALE_SERVE_URL" "$TAILSCALE_SERVE_URL"
         echo "  Saved TAILSCALE_SERVE_URL to ~/.sprite-config"
 
-        # Add to sprite-mobile .env
+        # Restart sprite-mobile if running to pick up new TAILSCALE_SERVE_URL
         SPRITE_MOBILE_DIR="$HOME/.sprite-mobile"
-        if [ -f "$SPRITE_MOBILE_DIR/.env" ]; then
-            if grep -q "^TAILSCALE_SERVE_URL=" "$SPRITE_MOBILE_DIR/.env"; then
-                sed -i "s|^TAILSCALE_SERVE_URL=.*|TAILSCALE_SERVE_URL=$TAILSCALE_SERVE_URL|" "$SPRITE_MOBILE_DIR/.env"
-            else
-                echo "TAILSCALE_SERVE_URL=$TAILSCALE_SERVE_URL" >> "$SPRITE_MOBILE_DIR/.env"
-            fi
-        else
-            echo "TAILSCALE_SERVE_URL=$TAILSCALE_SERVE_URL" > "$SPRITE_MOBILE_DIR/.env"
-        fi
-        echo "  Added TAILSCALE_SERVE_URL to $SPRITE_MOBILE_DIR/.env"
-
-        # Restart sprite-mobile to pick up new TAILSCALE_SERVE_URL for sprite network registration
         if sprite_api /v1/services 2>/dev/null | grep -q '"sprite-mobile"'; then
-            echo "Restarting sprite-mobile to pick up TAILSCALE_SERVE_URL..."
+            echo "  Restarting sprite-mobile to pick up TAILSCALE_SERVE_URL..."
             sprite_api -X DELETE '/v1/services/sprite-mobile' 2>/dev/null || true
             sleep 2
             sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
               \"cmd\": \"$SPRITE_MOBILE_DIR/start-service.sh\"
             }"
-            echo "sprite-mobile restarted"
+            echo "  sprite-mobile restarted"
         fi
     else
         TAILSCALE_SERVE_URL=""
