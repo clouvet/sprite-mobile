@@ -13,19 +13,22 @@ trap 'echo ""; echo "Aborted."; exit 130' INT
 NON_INTERACTIVE="${NON_INTERACTIVE:-false}"
 CONFIG_FILE=""
 
-# Detect which sprite API command is available
-if command -v sprite-env &>/dev/null; then
-    sprite_api() { sprite-env curl "$@"; }
-elif command -v curl-sprite-api &>/dev/null; then
-    sprite_api() { curl-sprite-api "$@"; }
-else
-    sprite_api() { echo "Warning: No sprite API command found" >&2; return 1; }
-fi
+# Sprite API helper
+sprite_api() { sprite-env curl "$@"; }
 
 # Configuration (set these or export before running)
 GIT_USER_NAME="${GIT_USER_NAME:-}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-}"
+# Load saved SPRITE_MOBILE_REPO from ~/.zshrc if not already set
+if [ -z "$SPRITE_MOBILE_REPO" ] && [ -f "$HOME/.zshrc" ]; then
+    SPRITE_MOBILE_REPO=$(grep "^export SPRITE_MOBILE_REPO=" "$HOME/.zshrc" 2>/dev/null | sed 's/^export SPRITE_MOBILE_REPO=//' | tail -1)
+fi
 SPRITE_MOBILE_REPO="${SPRITE_MOBILE_REPO:-https://github.com/clouvet/sprite-mobile}"
+
+# Load saved SPRITE_PUBLIC_URL from ~/.zshrc if not already set
+if [ -z "$SPRITE_PUBLIC_URL" ] && [ -f "$HOME/.zshrc" ]; then
+    SPRITE_PUBLIC_URL=$(grep "^export SPRITE_PUBLIC_URL=" "$HOME/.zshrc" 2>/dev/null | sed 's/^export SPRITE_PUBLIC_URL=//' | tail -1)
+fi
 SPRITE_PUBLIC_URL="${SPRITE_PUBLIC_URL:-}"
 APP_PORT="${APP_PORT:-8081}"
 WAKEUP_PORT="${WAKEUP_PORT:-8080}"
@@ -185,103 +188,17 @@ load_config() {
 # Step Functions
 # ============================================
 
-step_1_ghostty() {
+step_2_configuration() {
     echo ""
-    echo "=== Step 1: Ghostty Terminal Fix ==="
+    echo "=== Step 2: Configuration ==="
 
-    if infocmp xterm-ghostty &>/dev/null; then
-        echo "Ghostty terminfo already installed, skipping..."
-    else
-        echo "Installing Ghostty terminfo to fix backspace issue..."
-        cat > /tmp/ghostty.terminfo << 'TERMINFO_EOF'
-xterm-ghostty|Ghostty,
-        am, bce, bw, ccc, hs, km, mc5i, mir, msgr, npc, xenl,
-        colors#0x100, cols#80, it#8, lines#24, pairs#0x7fff,
-        acsc=``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
-        bel=^G, blink=\E[5m, bold=\E[1m, cbt=\E[Z,
-        civis=\E[?25l, clear=\E[H\E[2J, cnorm=\E[?12h\E[?25h,
-        cr=\r, csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=^H,
-        cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
-        cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
-        cvvis=\E[?12;25h, dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m,
-        dl=\E[%p1%dM, dl1=\E[M, dsl=\E]2;\E\\, ech=\E[%p1%dX,
-        ed=\E[J, el=\E[K, el1=\E[1K, flash=\E[?5h$<100/>\E[?5l,
-        fsl=^G, home=\E[H, hpa=\E[%i%p1%dG, ht=^I, hts=\EH,
-        ich=\E[%p1%d@, il=\E[%p1%dL, il1=\E[L, ind=\n,
-        initc=\E]4;%p1%d;rgb\:%p2%{255}%*%{1000}%/%2.2X/%p3%{255}%*%{1000}%/%2.2X/%p4%{255}%*%{1000}%/%2.2X\E\\,
-        invis=\E[8m, is2=\E[!p\E[?3;4l\E[4l\E>, kDC=\E[3;2~,
-        kEND=\E[1;2F, kHOM=\E[1;2H, kIC=\E[2;2~, kLFT=\E[1;2D,
-        kNXT=\E[6;2~, kPRV=\E[5;2~, kRIT=\E[1;2C, kbs=^?,
-        kcbt=\E[Z, kcub1=\EOD, kcud1=\EOB, kcuf1=\EOC,
-        kcuu1=\EOA, kdch1=\E[3~, kend=\EOF, kent=\EOM, kf1=\EOP,
-        kf10=\E[21~, kf11=\E[23~, kf12=\E[24~, kf13=\E[1;2P,
-        kf14=\E[1;2Q, kf15=\E[1;2R, kf16=\E[1;2S, kf17=\E[15;2~,
-        kf18=\E[17;2~, kf19=\E[18;2~, kf2=\EOQ, kf20=\E[19;2~,
-        kf21=\E[20;2~, kf22=\E[21;2~, kf23=\E[23;2~,
-        kf24=\E[24;2~, kf25=\E[1;5P, kf26=\E[1;5Q, kf27=\E[1;5R,
-        kf28=\E[1;5S, kf29=\E[15;5~, kf3=\EOR, kf30=\E[17;5~,
-        kf31=\E[18;5~, kf32=\E[19;5~, kf33=\E[20;5~,
-        kf34=\E[21;5~, kf35=\E[23;5~, kf36=\E[24;5~,
-        kf37=\E[1;6P, kf38=\E[1;6Q, kf39=\E[1;6R, kf4=\EOS,
-        kf40=\E[1;6S, kf41=\E[15;6~, kf42=\E[17;6~,
-        kf43=\E[18;6~, kf44=\E[19;6~, kf45=\E[20;6~,
-        kf46=\E[21;6~, kf47=\E[23;6~, kf48=\E[24;6~, kf5=\E[15~,
-        kf6=\E[17~, kf7=\E[18~, kf8=\E[19~, kf9=\E[20~,
-        khome=\EOH, kich1=\E[2~, kmous=\E[M, knp=\E[6~,
-        kpp=\E[5~, mc0=\E[i, mc4=\E[4i, mc5=\E[5i, meml=\El,
-        memu=\Em, oc=\E]104\E\\, op=\E[39;49m, rc=\E8,
-        rep=%p1%c\E[%p2%{1}%-%db, rev=\E[7m, ri=\EM,
-        ritm=\E[23m, rmacs=\E(B, rmam=\E[?7l, rmcup=\E[?1049l,
-        rmir=\E[4l, rmkx=\E[?1l, rmso=\E[27m, rmul=\E[24m,
-        rs1=\Ec,
-        rs2=\E[!p\E[?3;4l\E[4l\E>, sc=\E7, setab=\E[%?%p1%{8}%<%t4%p1%d%e%p1%{16}%<%t10%p1%{8}%-%d%e48;5;%p1%d%;m,
-        setaf=\E[%?%p1%{8}%<%t3%p1%d%e%p1%{16}%<%t9%p1%{8}%-%d%e38;5;%p1%d%;m,
-        sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;%?%p7%t;8%;m,
-        sgr0=\E(B\E[m, sitm=\E[3m, smacs=\E(0, smam=\E[?7h,
-        smcup=\E[?1049h, smir=\E[4h, smkx=\E[?1h, smso=\E[7m,
-        smul=\E[4m, tbc=\E[3g, tsl=\E]2;, u6=\E[%i%d;%dR,
-        u7=\E[6n, u8=\E[?%[;0123456789]c, u9=\E[c, vpa=\E[%i%p1%dd,
-TERMINFO_EOF
-        tic -x /tmp/ghostty.terminfo
-        rm /tmp/ghostty.terminfo
-        echo "Ghostty terminfo installed successfully"
-    fi
-}
-
-step_2_hostname() {
-    echo ""
-    echo "=== Step 2: Hostname and Git Configuration ==="
-
-    # Prompt for public URL and set hostname (skip prompt in non-interactive mode)
+    # Prompt for URLs and repo (skip prompts in non-interactive mode)
     if [ "$NON_INTERACTIVE" != "true" ]; then
         read -p "Sprite public URL (optional) [$SPRITE_PUBLIC_URL]: " input_url
         SPRITE_PUBLIC_URL="${input_url:-$SPRITE_PUBLIC_URL}"
-    fi
 
-    # Determine hostname: prefer SPRITE_NAME, then extract from URL
-    local target_hostname=""
-    if [ -n "$SPRITE_NAME" ]; then
-        target_hostname="$SPRITE_NAME"
-    elif [ -n "$SPRITE_PUBLIC_URL" ]; then
-        # Extract subdomain from URL (e.g., https://my-sprite.fly.dev -> my-sprite)
-        target_hostname=$(echo "$SPRITE_PUBLIC_URL" | sed -E 's|^https?://||' | cut -d'.' -f1)
-    fi
-
-    if [ -n "$target_hostname" ]; then
-        CURRENT_HOSTNAME=$(hostname)
-        if [ "$CURRENT_HOSTNAME" = "$target_hostname" ]; then
-            echo "Hostname already set to: $target_hostname"
-        else
-            echo "Setting hostname to: $target_hostname"
-            echo "$target_hostname" | sudo tee /etc/hostname > /dev/null
-            sudo hostname "$target_hostname"
-            # Add to /etc/hosts so sudo can resolve it
-            if ! grep -q "127.0.0.1.*$target_hostname" /etc/hosts 2>/dev/null; then
-                echo "127.0.0.1 $target_hostname" | sudo tee -a /etc/hosts > /dev/null
-                echo "  Added $target_hostname to /etc/hosts"
-            fi
-            echo "Hostname changed from '$CURRENT_HOSTNAME' to '$target_hostname'"
-        fi
+        read -p "sprite-mobile GitHub repo [$SPRITE_MOBILE_REPO]: " input_repo
+        SPRITE_MOBILE_REPO="${input_repo:-$SPRITE_MOBILE_REPO}"
     fi
 
     if [ -n "$SPRITE_PUBLIC_URL" ]; then
@@ -299,6 +216,20 @@ step_2_hostname() {
         fi
         # Export for current session
         export SPRITE_PUBLIC_URL
+    fi
+
+    # Save SPRITE_MOBILE_REPO to ~/.zshrc
+    if [ -n "$SPRITE_MOBILE_REPO" ]; then
+        if grep -q "^export SPRITE_MOBILE_REPO=" ~/.zshrc 2>/dev/null; then
+            sed -i "s|^export SPRITE_MOBILE_REPO=.*|export SPRITE_MOBILE_REPO=$SPRITE_MOBILE_REPO|" ~/.zshrc
+            echo "  Updated SPRITE_MOBILE_REPO in ~/.zshrc"
+        else
+            echo "" >> ~/.zshrc
+            echo "# sprite-mobile GitHub repo" >> ~/.zshrc
+            echo "export SPRITE_MOBILE_REPO=$SPRITE_MOBILE_REPO" >> ~/.zshrc
+            echo "  Added SPRITE_MOBILE_REPO to ~/.zshrc"
+        fi
+        export SPRITE_MOBILE_REPO
     fi
 
     # Git user configuration
@@ -549,26 +480,29 @@ CREDS_EOF
                 ;;
             2)
                 echo ""
-                echo "Enter Tigris bucket credentials:"
-                read -p "AWS_ACCESS_KEY_ID: " AWS_ACCESS_KEY_ID
-                read -p "AWS_SECRET_ACCESS_KEY: " AWS_SECRET_ACCESS_KEY
-                read -p "BUCKET_NAME: " BUCKET_NAME
-                read -p "AWS_ENDPOINT_URL_S3 [https://fly.storage.tigris.dev]: " AWS_ENDPOINT_URL_S3
-                AWS_ENDPOINT_URL_S3="${AWS_ENDPOINT_URL_S3:-https://fly.storage.tigris.dev}"
-                read -p "ORG (Fly.io org name): " FLY_ORG
+                echo "Paste JSON credentials (end with an empty line):"
+                echo "Example format:"
+                echo '  {"AWS_ACCESS_KEY_ID": "...", "AWS_SECRET_ACCESS_KEY": "...", ...}'
+                echo ""
 
-                mkdir -p "$SPRITE_NETWORK_DIR"
-                cat > "$SPRITE_NETWORK_CREDS" << CREDS_EOF
-{
-  "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
-  "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
-  "AWS_ENDPOINT_URL_S3": "$AWS_ENDPOINT_URL_S3",
-  "BUCKET_NAME": "$BUCKET_NAME",
-  "ORG": "$FLY_ORG"
-}
-CREDS_EOF
-                chmod 600 "$SPRITE_NETWORK_CREDS"
-                echo "Credentials saved to $SPRITE_NETWORK_CREDS"
+                # Read multi-line JSON input
+                json_input=""
+                while IFS= read -r line; do
+                    [ -z "$line" ] && break
+                    json_input+="$line"
+                done
+
+                # Validate it looks like JSON with required fields
+                if echo "$json_input" | grep -q "AWS_ACCESS_KEY_ID" && \
+                   echo "$json_input" | grep -q "AWS_SECRET_ACCESS_KEY" && \
+                   echo "$json_input" | grep -q "BUCKET_NAME"; then
+                    mkdir -p "$SPRITE_NETWORK_DIR"
+                    echo "$json_input" > "$SPRITE_NETWORK_CREDS"
+                    chmod 600 "$SPRITE_NETWORK_CREDS"
+                    echo "Credentials saved to $SPRITE_NETWORK_CREDS"
+                else
+                    echo "Error: JSON must contain AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and BUCKET_NAME"
+                fi
                 ;;
             *)
                 echo "Skipping Sprite Network setup"
@@ -969,7 +903,6 @@ CLAUDE_EOF
 }
 
 show_summary() {
-    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "unknown")
     TAILSCALE_SERVE_URL=$(tailscale serve status 2>/dev/null | grep -oE 'https://[^ ]+' | head -1)
 
     echo ""
@@ -977,23 +910,19 @@ show_summary() {
     echo "Setup Complete!"
     echo "============================================"
     echo ""
-    echo "Services running:"
-    echo "  - tailnet-gate (public): Port $WAKEUP_PORT - redirects to Tailscale URL"
-    echo "  - sprite-mobile:         http://$TAILSCALE_IP:$APP_PORT (Tailscale HTTP)"
-    echo ""
+    if [ -n "$SPRITE_PUBLIC_URL" ]; then
+        echo "Public URL: $SPRITE_PUBLIC_URL"
+        echo "  - Wakes sprite and redirects to Tailscale URL if on tailnet"
+        echo "  - Shows 'Unauthorized' if not on tailnet"
+        echo ""
+    fi
     if [ -n "$TAILSCALE_SERVE_URL" ]; then
         echo "Tailscale HTTPS (PWA-ready):"
         echo "  - sprite-mobile: $TAILSCALE_SERVE_URL"
         echo ""
     fi
-    if [ -n "$SPRITE_PUBLIC_URL" ]; then
-        echo "Public URL: $SPRITE_PUBLIC_URL"
-        echo "  - Wakes sprite and redirects to Tailscale URL if on tailnet"
-        echo "  - Shows 'Unauthorized' if not on tailnet"
-    fi
-    echo ""
     echo "To check service status:"
-    echo "  sprite_api /v1/services"
+    echo "  sprite-env services list"
     echo ""
     echo "NOTE: Log out and back in for environment variables to be available in new sessions."
     echo ""
@@ -1004,8 +933,7 @@ show_summary() {
 # ============================================
 
 STEP_NAMES=(
-    "Ghostty terminal fix"
-    "Hostname and git config"
+    "Configuration"
     "Claude CLI auth"
     "GitHub CLI auth"
     "Fly.io CLI (flyctl)"
@@ -1021,8 +949,7 @@ STEP_NAMES=(
 run_step() {
     local step_num="$1"
     case "$step_num" in
-        1) step_1_ghostty ;;
-        2) step_2_hostname ;;
+        2) step_2_configuration ;;
         3) step_3_claude ;;
         4) step_4_github ;;
         5) step_5_flyctl ;;
@@ -1043,8 +970,7 @@ show_menu() {
     echo "============================================"
     echo ""
     echo "Available steps:"
-    echo "   1.   Ghostty terminal fix (backspace issue)"
-    echo "   2.   Hostname and git configuration"
+    echo "   2.   Configuration (URLs, repo, git)"
     echo "   3.   Claude CLI authentication"
     echo "   4.   GitHub CLI authentication"
     echo "   5.   Fly.io CLI (flyctl) installation"
@@ -1084,8 +1010,7 @@ parse_step_range() {
 }
 
 run_all_steps() {
-    step_1_ghostty
-    step_2_hostname
+    step_2_configuration
     step_3_claude
     step_4_github
     step_5_flyctl
