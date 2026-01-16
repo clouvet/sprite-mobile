@@ -218,7 +218,7 @@ All environment variables are managed through `~/.sprite-config`, which serves a
 # ~/.sprite-config
 GH_TOKEN=ghp_xxxxx
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-xxxxx
-FLY_API_TOKEN=fm2_ xxxxx
+FLY_API_TOKEN=fm2_xxxxx
 SPRITE_API_TOKEN=your-org-name/org/id/token
 SPRITE_PUBLIC_URL=https://my-sprite.fly.dev
 TAILSCALE_SERVE_URL=https://my-sprite.tailxxxxx.ts.net
@@ -237,7 +237,7 @@ SPRITE_MOBILE_REPO=https://github.com/org/sprite-mobile
 | `SPRITE_NETWORK_ORG` | Fly.io org for sprite network | `my-org` |
 | `GH_TOKEN` | GitHub Personal Access Token | `ghp_xxxxx` |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token | `sk-ant-oat01-xxxxx` |
-| `FLY_API_TOKEN` | Fly.io API token | `fm2_ xxxxx` |
+| `FLY_API_TOKEN` | Fly.io API token | `fm2_xxxxx` |
 | `SPRITE_API_TOKEN` | Sprite CLI API token | `your-org-name/org/id/token` |
 
 These are automatically configured by the setup script and stored in `~/.sprite-config`.
