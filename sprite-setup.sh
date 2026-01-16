@@ -55,6 +55,16 @@ json_get_nested() {
     json_get "$section" "$key"
 }
 
+# Strip bracketed paste escape sequences from input
+# Fixes issue where pasting tokens includes ^[[200~ and ^[[201~ markers
+strip_bracketed_paste() {
+    local input="$1"
+    # Remove bracketed paste start (ESC[200~) and end (ESC[201~) sequences
+    input="${input#$'\e[200~'}"
+    input="${input%$'\e[201~'}"
+    echo "$input"
+}
+
 # ============================================
 # Sprite Config Management
 # ============================================
@@ -651,6 +661,7 @@ CLAUDE_EOF
                 echo "where you're already logged in, then paste the token here."
                 echo ""
                 read -p "OAuth token: " input_token
+                input_token=$(strip_bracketed_paste "$input_token")
                 if [ -n "$input_token" ]; then
                     export CLAUDE_CODE_OAUTH_TOKEN="$input_token"
                     save_claude_token "oauth" "$input_token"
@@ -663,6 +674,7 @@ CLAUDE_EOF
                 echo ""
                 echo "Enter your Anthropic API key (starts with sk-ant-):"
                 read -p "API key: " input_key
+                input_key=$(strip_bracketed_paste "$input_key")
                 if [ -n "$input_key" ]; then
                     export ANTHROPIC_API_KEY="$input_key"
                     save_claude_token "apikey" "$input_key"
@@ -740,6 +752,7 @@ step_4_github() {
                 echo "(For fine-grained tokens, grant Repository and Organization read access)"
                 echo ""
                 read -p "GitHub token: " input_token
+                input_token=$(strip_bracketed_paste "$input_token")
                 if [ -n "$input_token" ]; then
                     echo "$input_token" | gh auth login --with-token
                     gh auth setup-git 2>/dev/null || true
@@ -1070,6 +1083,7 @@ step_7_tailscale() {
             echo "  5. Copy the generated key"
             echo ""
             read -p "Paste your reusable auth key: " input_key
+            input_key=$(strip_bracketed_paste "$input_key")
 
             if [ -n "$input_key" ]; then
                 TAILSCALE_AUTH_KEY="$input_key"
