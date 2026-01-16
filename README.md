@@ -4,6 +4,27 @@
 
 sprite-mobile gives you a progressive web app chat UI for accessing Claude Code running in YOLO mode on a [Sprite](https://sprites.dev), an ideal vibe-coding interface on your phone. It allows input by text, voice, and image, persists sessions across clients, and seamlessly networks with your other sprites through Tailscale.
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Features](#features)
+- [Access Model](#access-model)
+- [Sprite Setup](#sprite-setup)
+- [Sprite Orchestration](#sprite-orchestration)
+- [Quick Start](#quick-start)
+- [Environment Variables](#environment-variables)
+- [Architecture](#architecture)
+  - [Services](#services)
+  - [Data Storage](#data-storage)
+  - [API Endpoints](#api-endpoints)
+  - [WebSocket](#websocket)
+  - [Keepalive](#keepalive)
+- [Session Lifecycle](#session-lifecycle)
+- [CLI Session Attachment](#cli-session-attachment)
+- [Configuration](#configuration)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
+
 ## Prerequisites
 
 This app is designed to run on a Sprite from [sprites.dev](https://sprites.dev). Sprites come with:
