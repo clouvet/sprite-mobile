@@ -10,7 +10,7 @@ import {
 } from "../lib/storage";
 import type { StoredMessage } from "../lib/types";
 import { backgroundProcesses, trySend } from "../lib/claude";
-import { discoverSprites, getSpriteStatus, getNetworkInfo, getHostname, updateHeartbeat } from "../lib/network";
+import { discoverSprites, getSpriteStatus, getNetworkInfo, getHostname, updateHeartbeat, deleteSprite } from "../lib/network";
 
 // Claude projects directory
 const CLAUDE_PROJECTS_DIR = join(process.env.HOME || "/home/sprite", ".claude", "projects");
@@ -387,6 +387,22 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     return (async () => {
       await updateHeartbeat();
       return Response.json({ ok: true });
+    })();
+  }
+
+  // DELETE /api/network/sprites/:hostname - Remove a sprite from the network
+  if (req.method === "DELETE" && path.startsWith("/api/network/sprites/")) {
+    const spriteHostname = path.replace("/api/network/sprites/", "");
+    if (!spriteHostname) {
+      return new Response("Hostname required", { status: 400 });
+    }
+    return (async () => {
+      try {
+        await deleteSprite(spriteHostname);
+        return Response.json({ ok: true, deleted: spriteHostname });
+      } catch (err: any) {
+        return Response.json({ error: err.message }, { status: 500 });
+      }
     })();
   }
 

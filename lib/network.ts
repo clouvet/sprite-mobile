@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { readFileSync, existsSync } from "fs";
 import { hostname } from "os";
 import type { NetworkSprite } from "./types";
@@ -73,6 +73,19 @@ export async function registerSprite(sprite: NetworkSprite): Promise<void> {
   }));
 
   console.log(`Registered sprite: ${sprite.hostname}`);
+}
+
+export async function deleteSprite(spriteHostname: string): Promise<void> {
+  if (!s3Client || !bucketName) {
+    throw new Error("Network not initialized");
+  }
+
+  await s3Client.send(new DeleteObjectCommand({
+    Bucket: bucketName,
+    Key: `registry/${spriteHostname}.json`,
+  }));
+
+  console.log(`Deleted sprite from network: ${spriteHostname}`);
 }
 
 export async function updateHeartbeat(): Promise<void> {

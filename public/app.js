@@ -1389,6 +1389,7 @@
 
       networkSpritesList.innerHTML = otherSprites.map(s => `
         <div class="sprite-item network ${s.status}"
+             data-hostname="${escapeHtml(s.hostname)}"
              data-tailscale-url="${escapeHtml(s.tailscaleUrl || '')}"
              data-public-url="${escapeHtml(s.publicUrl || '')}">
           <div class="sprite-status ${s.status}" title="${s.status}"></div>
@@ -1397,16 +1398,39 @@
             <div class="sprite-address">${escapeHtml(s.hostname)}</div>
             ${s.ownerEmail ? `<div class="sprite-owner">${escapeHtml(s.ownerEmail)}</div>` : ''}
           </div>
+          <button class="sprite-delete-btn" title="Remove from network" data-hostname="${escapeHtml(s.hostname)}">×</button>
         </div>
       `).join('');
 
       // Click handlers for network sprites
       networkSpritesList.querySelectorAll('.sprite-item').forEach(el => {
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (e) => {
+          // Ignore if clicking delete button
+          if (e.target.classList.contains('sprite-delete-btn')) return;
           const tailscaleUrl = el.dataset.tailscaleUrl;
           const publicUrl = el.dataset.publicUrl;
           if (tailscaleUrl) {
             navigateToNetworkSprite(tailscaleUrl, publicUrl);
+          }
+        });
+      });
+
+      // Delete button handlers
+      networkSpritesList.querySelectorAll('.sprite-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const hostname = btn.dataset.hostname;
+          if (!confirm(`Remove "${hostname}" from the sprite network?`)) return;
+          try {
+            const res = await fetch(`/api/network/sprites/${encodeURIComponent(hostname)}`, { method: 'DELETE' });
+            if (res.ok) {
+              await loadNetworkSprites();
+            } else {
+              const data = await res.json();
+              alert(`Failed to delete: ${data.error || 'Unknown error'}`);
+            }
+          } catch (err) {
+            alert(`Failed to delete: ${err.message}`);
           }
         });
       });

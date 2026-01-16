@@ -1003,6 +1003,28 @@
       opacity: 0.6;
     }
 
+    .sprite-delete-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 4px 8px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .sprite-item:hover .sprite-delete-btn,
+    .sprite-item:active .sprite-delete-btn {
+      opacity: 1;
+    }
+
+    .sprite-delete-btn:hover {
+      color: #ff6b6b;
+    }
+
     .sprite-status {
       width: 10px;
       height: 10px;
