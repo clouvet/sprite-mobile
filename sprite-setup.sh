@@ -499,31 +499,37 @@ step_3_claude() {
 
     CLAUDE_TOKEN_FILE="$HOME/.config/claude-code/token"
 
-    # Helper to save token to secured file and source from zshrc
+    # Helper to save token to secured file and export in zshrc
     save_claude_token() {
         local token_type="$1"  # "oauth" or "apikey"
         local token_value="$2"
 
-        mkdir -p "$(dirname "$CLAUDE_TOKEN_FILE")"
-
+        # Add export directly to .zshrc
         if [ "$token_type" = "oauth" ]; then
-            echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$token_value\"" > "$CLAUDE_TOKEN_FILE"
+            if ! grep -q "export CLAUDE_CODE_OAUTH_TOKEN=" ~/.zshrc 2>/dev/null; then
+                echo "" >> ~/.zshrc
+                echo "# Claude Code OAuth token" >> ~/.zshrc
+                echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$token_value\"" >> ~/.zshrc
+                echo "Added CLAUDE_CODE_OAUTH_TOKEN to ~/.zshrc"
+            else
+                # Update existing token
+                sed -i "s|^export CLAUDE_CODE_OAUTH_TOKEN=.*|export CLAUDE_CODE_OAUTH_TOKEN=\"$token_value\"|" ~/.zshrc
+                echo "Updated CLAUDE_CODE_OAUTH_TOKEN in ~/.zshrc"
+            fi
+            # Export for current session
+            export CLAUDE_CODE_OAUTH_TOKEN="$token_value"
         else
-            echo "export ANTHROPIC_API_KEY=\"$token_value\"" > "$CLAUDE_TOKEN_FILE"
+            if ! grep -q "export ANTHROPIC_API_KEY=" ~/.zshrc 2>/dev/null; then
+                echo "" >> ~/.zshrc
+                echo "# Anthropic API key" >> ~/.zshrc
+                echo "export ANTHROPIC_API_KEY=\"$token_value\"" >> ~/.zshrc
+                echo "Added ANTHROPIC_API_KEY to ~/.zshrc"
+            else
+                sed -i "s|^export ANTHROPIC_API_KEY=.*|export ANTHROPIC_API_KEY=\"$token_value\"|" ~/.zshrc
+                echo "Updated ANTHROPIC_API_KEY in ~/.zshrc"
+            fi
+            export ANTHROPIC_API_KEY="$token_value"
         fi
-        chmod 600 "$CLAUDE_TOKEN_FILE"
-
-        # Add source line to zshrc if not present
-        if ! grep -q "source.*claude-code/token" ~/.zshrc 2>/dev/null; then
-            echo "" >> ~/.zshrc
-            echo "# Claude Code token" >> ~/.zshrc
-            echo "[ -f \"$CLAUDE_TOKEN_FILE\" ] && source \"$CLAUDE_TOKEN_FILE\"" >> ~/.zshrc
-        fi
-
-        echo "Token saved to $CLAUDE_TOKEN_FILE (sourced from ~/.zshrc)"
-
-        # Source immediately so token is available for sprite-mobile startup
-        source "$CLAUDE_TOKEN_FILE"
     }
 
     if claude auth status &>/dev/null; then
@@ -607,6 +613,17 @@ step_4_github() {
         if gh auth status &>/dev/null; then
             echo "GitHub CLI authenticated successfully"
             echo "Git credential helper configured"
+
+            # Save GH_TOKEN to .zshrc for future shell sessions
+            if ! grep -q "export GH_TOKEN=" ~/.zshrc 2>/dev/null; then
+                echo "" >> ~/.zshrc
+                echo "# GitHub Personal Access Token" >> ~/.zshrc
+                echo "export GH_TOKEN=\"$GH_TOKEN\"" >> ~/.zshrc
+                echo "Added GH_TOKEN to ~/.zshrc"
+            else
+                sed -i "s|^export GH_TOKEN=.*|export GH_TOKEN=\"$GH_TOKEN\"|" ~/.zshrc
+                echo "Updated GH_TOKEN in ~/.zshrc"
+            fi
         else
             echo "Warning: GitHub authentication failed with provided token"
         fi
@@ -713,6 +730,17 @@ step_5_flyctl() {
         # FLY_API_TOKEN is already exported, flyctl will use it automatically
         if flyctl auth whoami &>/dev/null; then
             echo "Fly.io authenticated successfully with token"
+
+            # Save FLY_API_TOKEN to .zshrc for future shell sessions
+            if ! grep -q "export FLY_API_TOKEN=" ~/.zshrc 2>/dev/null; then
+                echo "" >> ~/.zshrc
+                echo "# Fly.io API token" >> ~/.zshrc
+                echo "export FLY_API_TOKEN=\"$FLY_API_TOKEN\"" >> ~/.zshrc
+                echo "Added FLY_API_TOKEN to ~/.zshrc"
+            else
+                sed -i "s|^export FLY_API_TOKEN=.*|export FLY_API_TOKEN=\"$FLY_API_TOKEN\"|" ~/.zshrc
+                echo "Updated FLY_API_TOKEN in ~/.zshrc"
+            fi
         else
             echo "Warning: FLY_API_TOKEN provided but authentication failed"
         fi
@@ -760,6 +788,17 @@ step_6_sprites() {
         sprite auth setup --token "$SPRITE_API_TOKEN"
         if [ $? -eq 0 ]; then
             echo "Sprites CLI authenticated successfully with token"
+
+            # Save SPRITE_API_TOKEN to .zshrc for future reference
+            if ! grep -q "export SPRITE_API_TOKEN=" ~/.zshrc 2>/dev/null; then
+                echo "" >> ~/.zshrc
+                echo "# Sprite CLI API token" >> ~/.zshrc
+                echo "export SPRITE_API_TOKEN=\"$SPRITE_API_TOKEN\"" >> ~/.zshrc
+                echo "Added SPRITE_API_TOKEN to ~/.zshrc"
+            else
+                sed -i "s|^export SPRITE_API_TOKEN=.*|export SPRITE_API_TOKEN=\"$SPRITE_API_TOKEN\"|" ~/.zshrc
+                echo "Updated SPRITE_API_TOKEN in ~/.zshrc"
+            fi
         else
             echo "Warning: Failed to authenticate with provided token"
             echo "  Token format should be: org-slug/org-id/token-id/token-value"
@@ -1037,9 +1076,9 @@ step_8_sprite_mobile() {
         echo "  Created $SPRITE_MOBILE_DIR/.env"
     fi
 
-    # Source token file if it exists (to ensure tokens are in environment)
-    if [ -f "$HOME/.config/claude-code/token" ]; then
-        source "$HOME/.config/claude-code/token"
+    # Source .zshrc to pick up any tokens added during setup
+    if [ -f "$HOME/.zshrc" ]; then
+        source "$HOME/.zshrc"
     fi
 
     # Check if sprite-mobile service is running
