@@ -581,10 +581,8 @@ CLAUDE_EOF
         return
     fi
 
-    # Check authentication status
-    if claude auth status &>/dev/null; then
-        echo "Claude CLI already authenticated"
-    elif [ "$NON_INTERACTIVE" = "true" ]; then
+    # No token provided, prompt for authentication
+    if [ "$NON_INTERACTIVE" = "true" ]; then
         if [ -f "$HOME/.claude/.credentials.json" ]; then
             echo "Claude credentials file installed (will be validated on first use)"
         else
