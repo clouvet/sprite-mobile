@@ -1,6 +1,8 @@
 # Sprite Mobile
 
 > **⚠️ This project is a work in progress and is subject to change at any time. Features, APIs, and behavior may be modified or removed without notice.**
+>
+> Features added to Sprites will likely make some of the hacks described below redundant, and hopefully a lot of this, especially setup, configuration, and orchestration, will be simplified in the near future.
 
 sprite-mobile gives you a progressive web app chat UI for accessing Claude Code running in YOLO mode on a [Sprite](https://sprites.dev), an ideal vibe-coding interface on your phone. It allows input by text, voice, and image, persists sessions across clients, and seamlessly networks with your other sprites through Tailscale.
 
