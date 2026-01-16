@@ -263,7 +263,7 @@ prompt_for_config() {
     # Check for saved config file
     if [ -f "$SPRITE_CONFIG_FILE" ]; then
         echo "Found saved config at $SPRITE_CONFIG_FILE"
-        read -p "Use saved config? [Y/n]: " use_saved
+        read -p "Use saved config? [Y/n]: " use_saved </dev/tty
         if [ "$use_saved" != "n" ] && [ "$use_saved" != "N" ]; then
             echo ""
             echo "Loading saved config..."
@@ -289,7 +289,8 @@ prompt_for_config() {
     local config=""
     local empty_lines=0
 
-    while IFS= read -r line; do
+    # Read from /dev/tty explicitly to avoid consuming stdin
+    while IFS= read -r line </dev/tty; do
         if [ -z "$line" ]; then
             empty_lines=$((empty_lines + 1))
             if [ $empty_lines -ge 1 ]; then
@@ -308,7 +309,7 @@ prompt_for_config() {
         echo ""
 
         # Offer to save for future use
-        read -p "Save this config for future sprites? [y/N]: " save_config_choice
+        read -p "Save this config for future sprites? [y/N]: " save_config_choice </dev/tty
         if [ "$save_config_choice" = "y" ] || [ "$save_config_choice" = "Y" ]; then
             save_config
         fi
