@@ -878,6 +878,8 @@ step_6_sprites() {
 step_6_5_network() {
     echo ""
     echo "=== Step 6.5: Sprite Network (Optional) ==="
+    echo "Note: Credentials are configured here, but sprite registration"
+    echo "      happens after Tailscale Serve (step 9) sets TAILSCALE_SERVE_URL"
 
     SPRITE_NETWORK_DIR="$HOME/.sprite-network"
     SPRITE_NETWORK_CREDS="$SPRITE_NETWORK_DIR/credentials.json"
@@ -1188,6 +1190,17 @@ step_9_tailscale_serve() {
             echo "TAILSCALE_SERVE_URL=$TAILSCALE_SERVE_URL" > "$SPRITE_MOBILE_DIR/.env"
         fi
         echo "  Added TAILSCALE_SERVE_URL to $SPRITE_MOBILE_DIR/.env"
+
+        # Restart sprite-mobile to pick up new TAILSCALE_SERVE_URL for sprite network registration
+        if sprite_api /v1/services 2>/dev/null | grep -q '"sprite-mobile"'; then
+            echo "Restarting sprite-mobile to pick up TAILSCALE_SERVE_URL..."
+            sprite_api -X DELETE '/v1/services/sprite-mobile' 2>/dev/null || true
+            sleep 2
+            sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
+              \"cmd\": \"$SPRITE_MOBILE_DIR/start-service.sh\"
+            }"
+            echo "sprite-mobile restarted"
+        fi
     else
         TAILSCALE_SERVE_URL=""
         echo "Could not determine Tailscale serve URL (check 'tailscale serve status')"
