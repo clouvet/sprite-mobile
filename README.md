@@ -87,6 +87,8 @@ The script is idempotent and can be safely re-run.
 
 The app is installed to `~/.sprite-mobile` (hidden directory). On each service start, it attempts to auto-update via `git pull` so all sprites receive updates when they wake up.
 
+**Note:** The setup script has experimental support for non-interactive setup via config file (see "Setup Script Options" below), but this approach is currently buggy. The preferred setup method at the moment is the interactive approach shown above.
+
 **Note:** During authentication:
 - Claude CLI may start a new Claude session after completing. Just type `exit` or press `Ctrl+C` to exit and continue.
 - Sprites CLI will prompt you to create a new sprite. After creating it, exit the sprite console to continue with setup.
