@@ -519,24 +519,8 @@ step_3_claude() {
             # Export for current session
             export CLAUDE_CODE_OAUTH_TOKEN="$token_value"
 
-            # Create .credentials.json so claude commands work without re-auth
-            mkdir -p ~/.claude
-            cat > ~/.claude/.credentials.json << CREDS_EOF
-{
-  "claudeAiOauth": {
-    "accessToken": "$token_value",
-    "refreshToken": "",
-    "expiresAt": 9999999999999,
-    "scopes": ["user:inference", "user:profile", "user:sessions:claude_code"],
-    "subscriptionType": "unknown",
-    "rateLimitTier": "unknown"
-  }
-}
-CREDS_EOF
-            chmod 600 ~/.claude/.credentials.json
-            echo "Created ~/.claude/.credentials.json for Claude CLI"
-
             # Set required flags in ~/.claude.json to skip onboarding and permissions
+            mkdir -p ~/.claude
             if [ -f ~/.claude.json ]; then
                 # Update existing file
                 if command -v jq &>/dev/null; then
