@@ -94,6 +94,8 @@ The app is installed to `~/.sprite-mobile` (hidden directory). On each service s
 
 ## Sprite Orchestration
 
+> **⚠️ Experimental:** This feature is experimental and may not work reliably.
+
 Once you have one sprite-mobile sprite set up, it can automatically create and configure new sprites with no manual intervention. This is useful for scaling your sprite fleet or letting Claude Code create new sprites on demand.
 
 ### Configuration Management
