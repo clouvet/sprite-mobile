@@ -1037,16 +1037,23 @@ step_8_sprite_mobile() {
         echo "  Created $SPRITE_MOBILE_DIR/.env"
     fi
 
+    # Source token file if it exists (to ensure tokens are in environment)
+    if [ -f "$HOME/.config/claude-code/token" ]; then
+        source "$HOME/.config/claude-code/token"
+    fi
+
     # Check if sprite-mobile service is running
     if sprite_api /v1/services 2>/dev/null | grep -q '"sprite-mobile"'; then
-        echo "sprite-mobile service already running"
-    else
-        echo "Starting sprite-mobile service on port $APP_PORT..."
-        sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
-          \"cmd\": \"bun\",
-          \"args\": [\"--hot\", \"run\", \"$SPRITE_MOBILE_DIR/server.ts\"]
-        }"
+        echo "sprite-mobile service already running, restarting to pick up new environment..."
+        sprite_api -X DELETE '/v1/services/sprite-mobile' 2>/dev/null || true
+        sleep 1
     fi
+
+    echo "Starting sprite-mobile service on port $APP_PORT..."
+    sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
+      \"cmd\": \"bun\",
+      \"args\": [\"--hot\", \"run\", \"$SPRITE_MOBILE_DIR/server.ts\"]
+    }"
 }
 
 step_9_tailscale_serve() {
@@ -1316,6 +1323,9 @@ show_summary() {
     fi
     echo "To check service status:"
     echo "  sprite-env services list"
+    echo ""
+    echo "Note: If you configured Claude or GitHub tokens, log out and back in"
+    echo "      to use 'claude' and 'gh' commands in new terminal sessions."
     echo ""
 }
 
