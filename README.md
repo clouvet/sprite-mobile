@@ -400,7 +400,7 @@ Sessions can specify a working directory (`cwd`) that Claude Code operates in. T
 
 ### Important Security Considerations
 
-⚠️ **This is a personal tool. Beware. If you wouldn't let someone into your Tailnet then you probably shouldn't let them anywhere near this app. Do not expose this app to the public internet or share your tailnet with untrusted users.** Anyone with access to the app has full control over your Claude Code sessions and can execute arbitrary commands on your Sprite. They'll also have whatever access you're scoped to for Fly, Sprites, and the GitHub cli. 😵
+⚠️ **Beware. If you wouldn't let someone into your Tailnet then you probably shouldn't let them anywhere near this app. Do not expose this app to the public internet or share your tailnet with untrusted users.** Anyone with access to the app has full control over your Claude Code sessions and can execute arbitrary commands on your Sprite. They'll also have whatever access you're scoped to for Fly, Sprites, and the GitHub cli. 😵
 
 ### Access Control
 
