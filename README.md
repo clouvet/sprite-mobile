@@ -91,7 +91,6 @@ The app is installed to `~/.sprite-mobile` (hidden directory). On each service s
 
 **Note:** During authentication:
 - Claude CLI may start a new Claude session after completing. Just type `exit` or press `Ctrl+C` to exit and continue.
-- Sprites CLI will prompt you to create a new sprite. After creating it, exit the sprite console to continue with setup.
 
 ## Sprite Orchestration
 
