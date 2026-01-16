@@ -9,5 +9,10 @@ if [ -f "$HOME/.sprite-config" ]; then
     set +a  # Stop exporting
 fi
 
+# Ensure .env file has secure permissions
+if [ -f "$HOME/.sprite-mobile/.env" ]; then
+    chmod 600 "$HOME/.sprite-mobile/.env"
+fi
+
 # Start the service
 exec bun --hot run "$HOME/.sprite-mobile/server.ts"

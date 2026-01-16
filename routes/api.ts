@@ -414,6 +414,12 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
         return new Response("Session ID required", { status: 400 });
       }
 
+      // Sanitize sessionId to prevent path traversal
+      const sanitizedSessionId = sessionId.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (sanitizedSessionId !== sessionId || sanitizedSessionId.length === 0) {
+        return new Response("Invalid session ID", { status: 400 });
+      }
+
       try {
         const formData = await req.formData();
         const file = formData.get("file") as File | null;
@@ -426,7 +432,7 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
           return new Response("Only images are allowed", { status: 400 });
         }
 
-        const sessionUploadsDir = join(UPLOADS_DIR, sessionId);
+        const sessionUploadsDir = join(UPLOADS_DIR, sanitizedSessionId);
         if (!existsSync(sessionUploadsDir)) {
           mkdirSync(sessionUploadsDir, { recursive: true });
         }
@@ -443,7 +449,7 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
           id,
           filename,
           mediaType: file.type,
-          url: `/api/uploads/${sessionId}/${filename}`,
+          url: `/api/uploads/${sanitizedSessionId}/${filename}`,
         });
       } catch (err) {
         console.error("Upload error:", err);
@@ -457,17 +463,27 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     const parts = path.split("/");
     const sessionId = parts[3];
     const filename = parts[4];
-    const filePath = join(UPLOADS_DIR, sessionId, filename);
+
+    // Sanitize sessionId and filename to prevent path traversal
+    const sanitizedSessionId = sessionId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9_.-]/g, '');
+
+    if (sanitizedSessionId !== sessionId || sanitizedFilename !== filename ||
+        sanitizedSessionId.length === 0 || sanitizedFilename.length === 0) {
+      return new Response("Invalid parameters", { status: 400 });
+    }
+
+    const filePath = join(UPLOADS_DIR, sanitizedSessionId, sanitizedFilename);
 
     try {
       if (!existsSync(filePath)) {
         return new Response("Not found", { status: 404 });
       }
       const content = readFileSync(filePath);
-      const contentType = filename.endsWith(".png") ? "image/png"
-        : filename.endsWith(".jpg") || filename.endsWith(".jpeg") ? "image/jpeg"
-        : filename.endsWith(".gif") ? "image/gif"
-        : filename.endsWith(".webp") ? "image/webp"
+      const contentType = sanitizedFilename.endsWith(".png") ? "image/png"
+        : sanitizedFilename.endsWith(".jpg") || sanitizedFilename.endsWith(".jpeg") ? "image/jpeg"
+        : sanitizedFilename.endsWith(".gif") ? "image/gif"
+        : sanitizedFilename.endsWith(".webp") ? "image/webp"
         : "application/octet-stream";
       return new Response(content, {
         headers: { "Content-Type": contentType },

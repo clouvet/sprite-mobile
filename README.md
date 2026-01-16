@@ -390,16 +390,34 @@ Sessions can specify a working directory (`cwd`) that Claude Code operates in. T
 
 ## Security
 
+### Intended Use: Personal Tool
+
+**sprite-mobile is designed as a personal tool for individual use, not for shared or public deployment.** Each person should run their own instance(s) on their own Sprite(s). This significantly simplifies the security model:
+
+- No multi-user authentication needed
+- No per-user permissions or isolation
+- Tailscale network membership IS the authentication
+
+### Important Security Considerations
+
+⚠️ **Do not expose this to the public internet or share your Tailscale network with untrusted users.** Anyone with access to the app has full control over your Claude Code sessions and can execute arbitrary commands on your Sprite.
+
 ### Access Control
 
 Access is controlled via Tailscale:
 - **Tailnet membership is the auth** - No passwords or tokens needed
 - **Public URL only redirects** - The tailnet gate checks if you can reach the Tailscale URL before redirecting
 - **Not on tailnet = Unauthorized** - Users outside your tailnet see a blocked page
+- **Trust model**: Anyone on your tailnet can use the app. Only add trusted devices/users to your tailnet.
 
 ### Claude Code Permissions
 
-This app runs Claude Code with `--dangerously-skip-permissions`, which allows Claude to execute commands without confirmation prompts. This is appropriate for a Sprite environment where the sandbox provides isolation, but be aware that Claude has full access to the Sprite's filesystem and can run arbitrary commands.
+This app runs Claude Code with `--dangerously-skip-permissions`, which allows Claude to execute commands without confirmation prompts. This is appropriate for:
+- Personal use where you trust your own prompts
+- A Sprite environment where the sandbox provides isolation
+- "YOLO mode" vibe-coding workflows
+
+Be aware that Claude has full access to the Sprite's filesystem and can run arbitrary commands. This is the intended behavior for a personal coding assistant.
 
 ## Troubleshooting
 
