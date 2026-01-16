@@ -1,11 +1,12 @@
 #!/bin/bash
-# Wrapper script to start sprite-mobile with environment from .zshrc
+# Wrapper script to start sprite-mobile with environment from ~/.sprite-config
 # This avoids logging sensitive tokens in service creation commands
 
-# Source zsh environment (where tokens are stored)
-if [ -f "$HOME/.zshrc" ]; then
-    # Extract just the export statements to avoid zsh-specific commands
-    eval "$(grep '^export' "$HOME/.zshrc" | grep -E 'CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY|GH_TOKEN')"
+# Source sprite config (single source of truth for environment variables)
+if [ -f "$HOME/.sprite-config" ]; then
+    set -a  # Export all variables
+    source "$HOME/.sprite-config"
+    set +a  # Stop exporting
 fi
 
 # Start the service
