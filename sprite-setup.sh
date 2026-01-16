@@ -536,32 +536,38 @@ CREDS_EOF
             chmod 600 ~/.claude/.credentials.json
             echo "Created ~/.claude/.credentials.json for Claude CLI"
 
-            # Set hasCompletedOnboarding in ~/.claude.json to skip onboarding
+            # Set required flags in ~/.claude.json to skip onboarding and permissions
             if [ -f ~/.claude.json ]; then
                 # Update existing file
                 if command -v jq &>/dev/null; then
                     tmp=$(mktemp)
-                    jq '.hasCompletedOnboarding = true' ~/.claude.json > "$tmp" && mv "$tmp" ~/.claude.json
-                    echo "Updated hasCompletedOnboarding in ~/.claude.json"
+                    jq '.hasCompletedOnboarding = true | .bypassPermissionsModeAccepted = true' ~/.claude.json > "$tmp" && mv "$tmp" ~/.claude.json
+                    echo "Updated hasCompletedOnboarding and bypassPermissionsModeAccepted in ~/.claude.json"
                 else
-                    # Fallback if jq not available - use sed (less reliable but works)
-                    if grep -q '"hasCompletedOnboarding"' ~/.claude.json; then
-                        sed -i 's/"hasCompletedOnboarding"[[:space:]]*:[[:space:]]*[^,}]*/"hasCompletedOnboarding": true/' ~/.claude.json
-                    else
+                    # Fallback if jq not available - use sed
+                    if ! grep -q '"hasCompletedOnboarding"' ~/.claude.json; then
                         sed -i 's/{/{\"hasCompletedOnboarding\": true, /' ~/.claude.json
+                    else
+                        sed -i 's/"hasCompletedOnboarding"[[:space:]]*:[[:space:]]*[^,}]*/"hasCompletedOnboarding": true/' ~/.claude.json
                     fi
-                    echo "Updated hasCompletedOnboarding in ~/.claude.json (via sed)"
+                    if ! grep -q '"bypassPermissionsModeAccepted"' ~/.claude.json; then
+                        sed -i 's/{/{\"bypassPermissionsModeAccepted\": true, /' ~/.claude.json
+                    else
+                        sed -i 's/"bypassPermissionsModeAccepted"[[:space:]]*:[[:space:]]*[^,}]*/"bypassPermissionsModeAccepted": true/' ~/.claude.json
+                    fi
+                    echo "Updated hasCompletedOnboarding and bypassPermissionsModeAccepted in ~/.claude.json (via sed)"
                 fi
             else
                 # Create minimal file
                 cat > ~/.claude.json << CLAUDE_EOF
 {
   "hasCompletedOnboarding": true,
+  "bypassPermissionsModeAccepted": true,
   "installMethod": "global",
   "autoUpdates": true
 }
 CLAUDE_EOF
-                echo "Created ~/.claude.json with hasCompletedOnboarding: true"
+                echo "Created ~/.claude.json with required flags"
             fi
         else
             if ! grep -q "export ANTHROPIC_API_KEY=" ~/.zshrc 2>/dev/null; then
