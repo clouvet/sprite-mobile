@@ -13,6 +13,18 @@ trap 'echo ""; echo "Aborted."; exit 130' INT
 NON_INTERACTIVE="${NON_INTERACTIVE:-false}"
 CONFIG_FILE=""
 
+# Auto-detect .sprite-config and enable non-interactive mode
+SPRITE_CONFIG_FILE="$HOME/.sprite-config"
+if [ -f "$SPRITE_CONFIG_FILE" ] && [ "$NON_INTERACTIVE" != "true" ] && [ -z "$CONFIG_FILE" ]; then
+    echo "Detected ~/.sprite-config, enabling non-interactive mode..."
+    set -a  # Export all variables
+    source "$SPRITE_CONFIG_FILE"
+    set +a  # Stop exporting
+    NON_INTERACTIVE="true"
+    echo "Loaded configuration from ~/.sprite-config"
+    echo ""
+fi
+
 # Sprite API helper
 sprite_api() { sprite-env curl "$@"; }
 
