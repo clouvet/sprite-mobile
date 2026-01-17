@@ -7,19 +7,31 @@
 
     // Sync hash with parent window (if in iframe)
     if (window.parent !== window) {
+      console.log('[iframe] Detected running in iframe, enabling hash sync');
+      console.log('[iframe] Initial hash:', window.location.hash);
+
       // Notify parent of hash changes
       window.addEventListener('hashchange', () => {
+        console.log('[iframe] Hash changed to:', window.location.hash);
+        console.log('[iframe] Sending postMessage to parent');
         window.parent.postMessage({ type: 'hashchange', hash: window.location.hash }, '*');
       });
 
       // Listen for hash changes from parent
       window.addEventListener('message', (event) => {
+        console.log('[iframe] Received message from parent:', event.data);
         if (event.data && event.data.type === 'hashchange' && event.data.hash !== undefined) {
+          console.log('[iframe] Parent sent new hash:', event.data.hash);
           if (window.location.hash !== event.data.hash) {
+            console.log('[iframe] Updating hash to:', event.data.hash);
             window.location.hash = event.data.hash;
+          } else {
+            console.log('[iframe] Hash already matches, no update needed');
           }
         }
       });
+    } else {
+      console.log('[iframe] NOT in iframe, hash sync disabled');
     }
 
     // Elements
