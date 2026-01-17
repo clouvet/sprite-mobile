@@ -498,6 +498,7 @@ step_2_configuration() {
     ensure_shell_config_sourcing
 
     # Auto-detect sprite public URL if not already set
+    URL_AUTO_DETECTED=false
     if [ -z "$SPRITE_PUBLIC_URL" ]; then
         CURRENT_HOSTNAME=$(hostname)
 
@@ -515,6 +516,15 @@ step_2_configuration() {
                 if [ -n "$AUTO_DETECTED_URL" ]; then
                     SPRITE_PUBLIC_URL="$AUTO_DETECTED_URL"
                     echo "Auto-detected public URL: $SPRITE_PUBLIC_URL"
+                    URL_AUTO_DETECTED=true
+
+                    # Make the URL public
+                    echo "Setting URL to public access..."
+                    if sprite url update --auth public -s "$CURRENT_HOSTNAME" 2>/dev/null; then
+                        echo "URL access set to public"
+                    else
+                        echo "Warning: Could not set URL to public (may require permissions)"
+                    fi
                 else
                     echo "Could not parse public URL from API response"
                 fi
@@ -526,8 +536,11 @@ step_2_configuration() {
 
     # Prompt for URLs and repo (skip prompts in non-interactive mode)
     if [ "$NON_INTERACTIVE" != "true" ]; then
-        read -p "Sprite public URL (optional) [$SPRITE_PUBLIC_URL]: " input_url
-        SPRITE_PUBLIC_URL="${input_url:-$SPRITE_PUBLIC_URL}"
+        # Only prompt for URL if it wasn't auto-detected
+        if [ "$URL_AUTO_DETECTED" != "true" ]; then
+            read -p "Sprite public URL (optional) [$SPRITE_PUBLIC_URL]: " input_url
+            SPRITE_PUBLIC_URL="${input_url:-$SPRITE_PUBLIC_URL}"
+        fi
 
         read -p "sprite-mobile GitHub repo [$SPRITE_MOBILE_REPO]: " input_repo
         SPRITE_MOBILE_REPO="${input_repo:-$SPRITE_MOBILE_REPO}"
