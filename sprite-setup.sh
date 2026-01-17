@@ -1283,39 +1283,60 @@ const html = \`<!DOCTYPE html>
 <body>
   <iframe src="\${TAILSCALE_URL}" allow="camera; microphone"></iframe>
   <script>
-    // Ping keepalive endpoint every 10 seconds
-    function ping() {
-      fetch('/keepalive', { cache: 'no-store' })
-        .then(() => console.log('[gate] Keepalive ping OK'))
-        .catch(() => console.log('[gate] Keepalive ping failed'));
+    // Open WebSocket connection to keep sprite awake
+    function connectKeepalive() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(protocol + '//' + window.location.host + '/keepalive');
+
+      ws.onopen = () => {
+        console.log('[gate] Keepalive WebSocket connected');
+      };
+
+      ws.onclose = () => {
+        console.log('[gate] Keepalive WebSocket closed, reconnecting...');
+        setTimeout(connectKeepalive, 1000);
+      };
+
+      ws.onerror = (err) => {
+        console.log('[gate] Keepalive WebSocket error:', err);
+      };
     }
 
-    // Start immediately and repeat
-    ping();
-    setInterval(ping, 10000);
+    connectKeepalive();
   </script>
 </body>
 </html>\`;
 
 const server = Bun.serve({
   port: PORT,
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
 
-    // Keepalive endpoint - simple response to keep sprite awake
+    // Keepalive WebSocket - keeps sprite awake with persistent connection
     if (url.pathname === '/keepalive') {
-      return new Response("pong", {
-        headers: {
-          "Content-Type": "text/plain",
-          "Cache-Control": "no-cache"
-        },
-      });
+      const upgraded = server.upgrade(req);
+      if (!upgraded) {
+        return new Response("WebSocket upgrade failed", { status: 400 });
+      }
+      return undefined;
     }
 
     // Main page with iframe
     return new Response(html, {
       headers: { "Content-Type": "text/html" },
     });
+  },
+
+  websocket: {
+    open(ws) {
+      console.log("[gate] Keepalive WebSocket opened");
+    },
+    close(ws) {
+      console.log("[gate] Keepalive WebSocket closed");
+    },
+    message(ws, message) {
+      // Echo any messages back
+    },
   },
 });
 
