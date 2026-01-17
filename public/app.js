@@ -306,51 +306,16 @@
     function startPublicKeepalive() {
       if (!spritePublicUrl || publicKeepaliveInterval) return;
 
-      console.log('[keepalive] Starting streaming connection to:', spritePublicUrl + '/keepalive');
-
-      // Start streaming keepalive connection
-      fetch(spritePublicUrl + '/keepalive', {
-        method: 'GET',
-        cache: 'no-store',
-      }).then(response => {
-        if (!response.ok) {
-          console.log('[keepalive] Failed to connect, status:', response.status);
-          // Retry after 5 seconds
-          setTimeout(startPublicKeepalive, 5000);
-          return;
-        }
-
-        console.log('[keepalive] Streaming connection established');
-        const reader = response.body.getReader();
-
-        // Read stream (keeps connection alive)
-        function read() {
-          reader.read().then(({ done }) => {
-            if (done) {
-              console.log('[keepalive] Stream closed, reconnecting...');
-              setTimeout(startPublicKeepalive, 1000);
-              return;
-            }
-            // Continue reading
-            read();
-          }).catch(err => {
-            console.log('[keepalive] Read error:', err, '- reconnecting...');
-            setTimeout(startPublicKeepalive, 1000);
-          });
-        }
-
-        read();
-      }).catch(err => {
-        console.log('[keepalive] Connection error:', err, '- retrying...');
-        setTimeout(startPublicKeepalive, 5000);
-      });
-
-      // Mark as started
-      publicKeepaliveInterval = true;
+      // Ping every 30 seconds
+      publicKeepaliveInterval = setInterval(pingPublicUrl, 30000);
     }
 
     function pingPublicUrl() {
-      // No longer used - keeping for backwards compatibility
+      if (!spritePublicUrl) return;
+
+      fetch(spritePublicUrl, { mode: 'no-cors', cache: 'no-store' })
+        .then(() => console.log('Public keepalive ping sent'))
+        .catch(() => console.log('Public keepalive ping failed'));
     }
 
     // Configure marked
