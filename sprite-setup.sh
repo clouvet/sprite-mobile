@@ -1361,32 +1361,44 @@ const html = \`<!DOCTYPE html>
 
 const server = Bun.serve({
   port: PORT,
-  async fetch() {
-    // Return streaming response to keep HTTP connection open
-    // This keeps the sprite awake for 30 minutes
-    const stream = new ReadableStream({
-      async start(controller) {
-        // Send the HTML immediately
-        controller.enqueue(new TextEncoder().encode(html));
+  async fetch(req) {
+    const url = new URL(req.url);
 
-        // Keep connection open for 30 minutes with periodic chunks
-        const endTime = Date.now() + 30 * 60 * 1000; // 30 minutes
-        const keepAlive = setInterval(() => {
-          if (Date.now() >= endTime) {
-            clearInterval(keepAlive);
+    // Keep-alive endpoint for sprite-mobile to call
+    if (url.pathname === '/keepalive') {
+      const stream = new ReadableStream({
+        start(controller) {
+          console.log("[gate] Keep-alive connection opened");
+
+          // Send periodic chunks to keep connection alive
+          const interval = setInterval(() => {
+            try {
+              controller.enqueue(new TextEncoder().encode("ping\\n"));
+            } catch (e) {
+              clearInterval(interval);
+            }
+          }, 15000); // Every 15 seconds
+
+          // Cleanup when client disconnects
+          req.signal.addEventListener('abort', () => {
+            clearInterval(interval);
             controller.close();
-            console.log("[gate] Keep-alive timeout, closing connection");
-          } else {
-            // Send invisible HTML comment to keep connection alive
-            controller.enqueue(new TextEncoder().encode("<!-- keepalive -->"));
-          }
-        }, 10000); // Every 10 seconds
+            console.log("[gate] Keep-alive connection closed");
+          });
+        }
+      });
 
-        console.log("[gate] Started streaming keep-alive (30min timeout)");
-      }
-    });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/plain",
+          "Cache-Control": "no-cache",
+          "X-Accel-Buffering": "no"
+        },
+      });
+    }
 
-    return new Response(stream, {
+    // Regular gate page
+    return new Response(html, {
       headers: { "Content-Type": "text/html" },
     });
   },
