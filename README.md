@@ -53,8 +53,9 @@ If running elsewhere, you'll need to install these manually and authenticate Cla
 - **Smart Auto-focus**: Input field auto-focuses on desktop after Claude responds (disabled on mobile to avoid keyboard popup)
 - **Voice Input**: Tap the microphone button to dictate messages (uses Web Speech API, works on iOS Safari and Android Chrome)
 - **Dynamic Branding**: Header displays the sprite's hostname with a neon green 👾
-- **Tailscale Integration**: HTTPS access via Tailscale Serve with automatic redirect from public URL
-- **Tailnet Gate**: Public URL wakes sprite and redirects to Tailscale URL (if on tailnet)
+- **Tailscale Integration**: HTTPS access via Tailscale Serve, embedded in iframe from public URL
+- **Tailnet Gate**: Public URL wakes sprite and embeds Tailscale URL in iframe (if authorized)
+- **Deep Linking**: URL hash syncs bidirectionally between parent and iframe for shareable session links
 - **PWA Support**: Installable as a Progressive Web App, works offline (requires HTTPS via Tailscale Serve)
 - **Auto-update**: Pulls latest code when the service starts
 - **Sprite Network**: Automatic discovery of other sprites in your Fly.io organization via shared Tigris bucket
@@ -71,20 +72,25 @@ Public URL (https://sprite.fly.dev)
          ▼
    Tailnet Gate (port 8080)
          │
-         ├── On tailnet? ──→ Redirect to Tailscale HTTPS URL
+         ├── Embed iframe with Tailscale HTTPS URL
+         │   │
+         │   ├── Iframe loads? ──→ Show sprite-mobile interface
+         │   │                     (WebSocket keeps sprite awake)
+         │   │
+         │   └── Iframe fails (4s timeout)? ──→ Show "Unauthorized" 👾 🚫
          │
-         └── Not on tailnet? ──→ Show "Unauthorized" 👾 🚫
+         └── Hash syncing ──→ Deep linking to specific sessions
 ```
 
 **Three access paths:**
 
 | Path | URL | Auth | HTTPS | PWA |
 |------|-----|------|-------|-----|
-| Public | `https://sprite.fly.dev` | Tailnet Gate | Yes | Redirects |
+| Public | `https://sprite.fly.dev` | Tailnet Gate | Yes | Via iframe |
 | Tailscale Serve | `https://my-sprite.ts.net` | Tailnet only | Yes | Yes |
 | Tailscale IP | `http://100.x.x.x:8081` | Tailnet only | No | No |
 
-**Recommended**: Bookmark the public URL. It wakes the sprite and auto-redirects to the Tailscale HTTPS URL when you're on the tailnet.
+**Recommended**: Bookmark the public URL. It wakes the sprite and embeds the Tailscale HTTPS URL in an iframe (with hash syncing for deep linking). A WebSocket keepalive keeps the sprite awake while the page is open.
 
 ## Sprite Setup
 
@@ -101,16 +107,17 @@ To set up a fresh Sprite with all dependencies, authentication, and services:
    ```
 
 The script will:
-1. Configure hostname, git user, URLs, and repo
-2. Authenticate Claude CLI
-3. Authenticate GitHub CLI
-4. Install Fly.io CLI
-5. Install Sprites CLI
+1. Install Sprites CLI and authenticate
+2. Configure hostname, git user, URLs, and repo (with auto-detection of public URL)
+3. Authenticate Claude CLI
+4. Authenticate GitHub CLI
+5. Install Fly.io CLI
 6. Install and configure Tailscale
 7. Set up Tailscale Serve (HTTPS for PWA support)
 8. Clone and run sprite-mobile
 9. Set up Sprite Network credentials (optional - enables automatic discovery of other sprites in your org)
-10. Start the Tailnet Gate (public entry point)
+10. Start the Tailnet Gate (public entry point that embeds Tailscale URL via iframe)
+11. Create CLAUDE.md with sprite environment instructions
 
 The script is idempotent and can be safely re-run.
 
@@ -279,8 +286,8 @@ After setup, these services run on your sprite:
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `tailnet-gate` | 8080 | Public entry point, redirects to Tailscale URL |
-| `sprite-mobile` | 8081 | Main app server |
+| `tailnet-gate` | 8080 | Public entry point, embeds Tailscale URL in iframe with WebSocket keepalive |
+| `sprite-mobile` | 8081 | Main app server (accessed via Tailscale) |
 | `tailscaled` | - | Tailscale daemon |
 
 ### Data Storage
@@ -341,7 +348,13 @@ Connect to `/ws?session={sessionId}` to interact with a chat session.
 
 ### Keepalive
 
-A separate WebSocket endpoint at `/ws/keepalive` keeps the Sprite awake while the app is open.
+Two WebSocket endpoints keep the Sprite awake:
+
+1. **Public Gate Keepalive** (`/keepalive` on port 8080): The tailnet-gate opens a WebSocket connection to the sprite's http_port (8080) to keep it awake while the public URL is open. This ensures the sprite doesn't suspend before the Tailscale connection is established.
+
+2. **App Keepalive** (`/ws/keepalive` on port 8081): The sprite-mobile app itself opens a WebSocket to keep the sprite awake while the app is in use.
+
+Both use persistent WebSocket connections because sprites stay awake as long as there's an active connection to their http_port or any running service.
 
 ## Session Lifecycle
 
@@ -406,8 +419,8 @@ Sessions can specify a working directory (`cwd`) that Claude Code operates in. T
 
 Access is controlled via Tailscale:
 - **Tailnet membership is the auth** - No passwords or tokens needed
-- **Public URL only redirects** - The tailnet gate checks if you can reach the Tailscale URL before redirecting
-- **Not on tailnet = Unauthorized** - Users outside your tailnet see a blocked page
+- **Public URL embeds via iframe** - The tailnet gate embeds the Tailscale URL in an iframe; if it fails to load within 4 seconds, shows "Unauthorized"
+- **Not on tailnet = Unauthorized** - Users outside your tailnet see a blocked page with 👾 🚫
 - **Trust model**: Anyone on your tailnet can use the app. Only add trusted devices/users to your tailnet.
 
 ### Claude Code Permissions
