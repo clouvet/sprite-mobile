@@ -6,15 +6,24 @@
     }
 
     // Sync hash with parent window (if in iframe)
-    if (window.parent !== window) {
+    const isInIframe = window.parent !== window;
+    let notifyParentOfHashChange;
+
+    if (isInIframe) {
       console.log('[iframe] Detected running in iframe, enabling hash sync');
       console.log('[iframe] Initial hash:', window.location.hash);
 
-      // Notify parent of hash changes
+      // Helper to notify parent of hash changes
+      notifyParentOfHashChange = () => {
+        const hash = window.location.hash;
+        console.log('[iframe] Notifying parent of hash:', hash);
+        window.parent.postMessage({ type: 'hashchange', hash: hash }, '*');
+      };
+
+      // Notify parent when hash changes via hashchange event
       window.addEventListener('hashchange', () => {
-        console.log('[iframe] Hash changed to:', window.location.hash);
-        console.log('[iframe] Sending postMessage to parent');
-        window.parent.postMessage({ type: 'hashchange', hash: window.location.hash }, '*');
+        console.log('[iframe] hashchange event fired, hash:', window.location.hash);
+        notifyParentOfHashChange();
       });
 
       // Listen for hash changes from parent
@@ -32,6 +41,8 @@
       });
     } else {
       console.log('[iframe] NOT in iframe, hash sync disabled');
+      // No-op when not in iframe
+      notifyParentOfHashChange = () => {};
     }
 
     // Elements
@@ -488,6 +499,9 @@
       messageCountSinceLastTitleUpdate = 0;
       // Update URL hash to persist session across refreshes
       history.replaceState(null, '', `#session=${session.id}`);
+      // Manually notify parent since history.replaceState doesn't trigger hashchange
+      console.log('[iframe] Called history.replaceState with session:', session.id);
+      notifyParentOfHashChange();
     }
 
     function showEmptyState() {
@@ -502,6 +516,9 @@
       regenerateTitleBtn.classList.remove('visible');
       // Clear URL hash when no session selected
       history.replaceState(null, '', location.pathname);
+      // Manually notify parent since history.replaceState doesn't trigger hashchange
+      console.log('[iframe] Called history.replaceState to clear hash');
+      notifyParentOfHashChange();
     }
 
     // WebSocket
