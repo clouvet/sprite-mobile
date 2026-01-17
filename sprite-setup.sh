@@ -1286,12 +1286,22 @@ const html = \`<!DOCTYPE html>
     // Set iframe src with hash from current URL
     const tailscaleUrl = "\${TAILSCALE_URL}";
     const hash = window.location.hash;
-    document.getElementById('app-frame').src = tailscaleUrl + hash;
+    const iframe = document.getElementById('app-frame');
+    iframe.src = tailscaleUrl + hash;
 
-    // Update iframe when hash changes
+    // Update iframe when outer hash changes
     window.addEventListener('hashchange', () => {
       const newHash = window.location.hash;
-      document.getElementById('app-frame').src = tailscaleUrl + newHash;
+      iframe.contentWindow.postMessage({ type: 'hashchange', hash: newHash }, '*');
+    });
+
+    // Update outer URL when iframe hash changes
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'hashchange' && event.data.hash !== undefined) {
+        if (window.location.hash !== event.data.hash) {
+          window.location.hash = event.data.hash;
+        }
+      }
     });
 
     // Open WebSocket connection to keep sprite awake

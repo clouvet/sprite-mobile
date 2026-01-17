@@ -5,6 +5,23 @@
         .catch((err) => console.log('Service worker registration failed:', err));
     }
 
+    // Sync hash with parent window (if in iframe)
+    if (window.parent !== window) {
+      // Notify parent of hash changes
+      window.addEventListener('hashchange', () => {
+        window.parent.postMessage({ type: 'hashchange', hash: window.location.hash }, '*');
+      });
+
+      // Listen for hash changes from parent
+      window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'hashchange' && event.data.hash !== undefined) {
+          if (window.location.hash !== event.data.hash) {
+            window.location.hash = event.data.hash;
+          }
+        }
+      });
+    }
+
     // Elements
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('overlay');
