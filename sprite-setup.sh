@@ -1303,6 +1303,9 @@ const server = Bun.serve({
         start(controller) {
           console.log("[gate] Keepalive connection opened");
 
+          // Send initial ping immediately
+          controller.enqueue(new TextEncoder().encode("ping\\n"));
+
           // Send periodic chunks
           const interval = setInterval(() => {
             try {
