@@ -30,8 +30,7 @@ if [ -z "$SPRITE_PUBLIC_URL" ] && [ -f "$HOME/.zshrc" ]; then
     SPRITE_PUBLIC_URL=$(grep "^export SPRITE_PUBLIC_URL=" "$HOME/.zshrc" 2>/dev/null | sed 's/^export SPRITE_PUBLIC_URL=//' | tail -1)
 fi
 SPRITE_PUBLIC_URL="${SPRITE_PUBLIC_URL:-}"
-APP_PORT="${APP_PORT:-8081}"
-WAKEUP_PORT="${WAKEUP_PORT:-8080}"
+APP_PORT="${APP_PORT:-8080}"
 TAILSCALE_AUTH_KEY="${TAILSCALE_AUTH_KEY:-}"
 
 # ============================================
@@ -213,8 +212,7 @@ export_config() {
     "auth_key": "$tailscale_auth_key"
   },
   "ports": {
-    "app": $APP_PORT,
-    "wakeup": $WAKEUP_PORT
+    "app": $APP_PORT
   },
   "skip_steps": []
 }
@@ -1195,10 +1193,11 @@ step_8_sprite_mobile() {
         sleep 1
     fi
 
-    echo "Starting sprite-mobile service on port $APP_PORT..."
+    echo "Starting sprite-mobile service on port $APP_PORT (public http_port)..."
     # Use wrapper script that sources .zshrc to avoid logging tokens
     sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
-      \"cmd\": \"$SPRITE_MOBILE_DIR/start-service.sh\"
+      \"cmd\": \"$SPRITE_MOBILE_DIR/start-service.sh\",
+      \"http_port\": $APP_PORT
     }"
 }
 
@@ -1243,139 +1242,18 @@ step_9_tailscale_serve() {
 
 step_10_tailnet_gate() {
     echo ""
-    echo "=== Step 10: Tailnet Gate ==="
-    echo "Public endpoint that redirects to Tailscale URL if on tailnet"
+    echo "=== Step 10: Tailnet Gate (Deprecated) ==="
+    echo "This step is no longer needed - sprite-mobile now serves directly on port 8080"
+    echo "Cleaning up old tailnet-gate service if it exists..."
 
-    GATE_DIR="$HOME/.tailnet-gate"
-
-    # Get TAILSCALE_SERVE_URL if not already set
-    if [ -z "$TAILSCALE_SERVE_URL" ]; then
-        TAILSCALE_SERVE_URL=$(tailscale serve status 2>/dev/null | grep -oE 'https://[^ ]+' | head -1)
-    fi
-
-    # Always recreate the gate server (in case TAILSCALE_SERVE_URL changed)
-    echo "Creating tailnet gate server..."
-    mkdir -p "$GATE_DIR"
-    cat > "$GATE_DIR/server.ts" << GATE_EOF
-const PORT = 8080;
-const TAILSCALE_URL = "${TAILSCALE_SERVE_URL}";
-
-const html = \`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Connecting...</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #1a1a2e;
-      color: #fff;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .container {
-      text-align: center;
-      padding: 2rem;
-    }
-    .emoji {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-      filter: sepia(1) saturate(5) hue-rotate(70deg) brightness(1.1);
-    }
-    .blocked { display: none; }
-    .blocked .emoji { filter: none; }
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-    .spinner {
-      width: 24px;
-      height: 24px;
-      border: 3px solid #333;
-      border-top-color: #39ff14;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 1rem auto;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <div class="container" id="loading">
-    <div class="emoji">👾</div>
-    <h1>Connecting...</h1>
-    <div class="spinner"></div>
-  </div>
-  <div class="container blocked" id="blocked">
-    <div class="emoji">👾 🚫</div>
-    <h1>Unauthorized</h1>
-  </div>
-  <script>
-    const tailscaleUrl = "\${TAILSCALE_URL}";
-    const maxRetries = 10;
-    const retryDelay = 2000;
-
-    async function tryConnect(attempt) {
-      try {
-        const r = await fetch(tailscaleUrl + '/api/config', {
-          mode: 'cors',
-          signal: AbortSignal.timeout(5000)
-        });
-        if (r.ok) {
-          window.location.href = tailscaleUrl;
-        } else {
-          throw new Error('not ok');
-        }
-      } catch (e) {
-        if (attempt < maxRetries) {
-          setTimeout(() => tryConnect(attempt + 1), retryDelay);
-        } else {
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('blocked').style.display = 'block';
-        }
-      }
-    }
-
-    if (!tailscaleUrl) {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('blocked').style.display = 'block';
-    } else {
-      tryConnect(1);
-    }
-  </script>
-</body>
-</html>\`;
-
-const server = Bun.serve({
-  port: PORT,
-  fetch() {
-    return new Response(html, {
-      headers: { "Content-Type": "text/html" },
-    });
-  },
-});
-
-console.log("Tailnet gate running on http://localhost:" + PORT);
-console.log("Redirects to: " + (TAILSCALE_URL || "(not configured)"));
-GATE_EOF
-
-    # Check if gate service is running
+    # Delete old tailnet-gate service if running
     if sprite_api /v1/services 2>/dev/null | grep -q '"tailnet-gate"'; then
-        echo "Restarting tailnet-gate service..."
+        echo "Removing old tailnet-gate service..."
         sprite_api -X DELETE '/v1/services/tailnet-gate' 2>/dev/null || true
-        sleep 1
+        echo "Old tailnet-gate service removed"
+    else
+        echo "No tailnet-gate service found (already clean)"
     fi
-
-    echo "Starting tailnet-gate service on port $WAKEUP_PORT..."
-    sprite_api -X PUT '/v1/services/tailnet-gate?duration=3s' -d "{
-      \"cmd\": \"bun\",
-      \"args\": [\"run\", \"$GATE_DIR/server.ts\"],
-      \"http_port\": $WAKEUP_PORT
-    }"
 }
 
 step_11_claude_md() {

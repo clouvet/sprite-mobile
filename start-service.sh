@@ -9,6 +9,9 @@ if [ -f "$HOME/.sprite-config" ]; then
     set +a  # Stop exporting
 fi
 
+# Set PORT for sprite-mobile (public http_port)
+export PORT=8080
+
 # Ensure .env file has secure permissions
 if [ -f "$HOME/.sprite-mobile/.env" ]; then
     chmod 600 "$HOME/.sprite-mobile/.env"

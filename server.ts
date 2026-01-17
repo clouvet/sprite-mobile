@@ -61,6 +61,18 @@ const server = Bun.serve({
   async fetch(req, server) {
     const url = new URL(req.url);
 
+    // Tailscale access control: only allow requests from tailnet
+    // Tailscale adds specific headers to requests from the tailnet
+    const isTailscaleRequest = req.headers.has("Tailscale-User") ||
+                                req.headers.has("Tailscale-Login");
+
+    if (!isTailscaleRequest) {
+      return new Response("Unauthorized - Access via Tailscale only", {
+        status: 403,
+        headers: { "Content-Type": "text/plain" }
+      });
+    }
+
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
