@@ -1257,19 +1257,6 @@ step_10_tailnet_gate() {
     echo "Creating tailnet gate server..."
     mkdir -p "$GATE_DIR"
 
-    # Create keep-alive script
-    cat > "$GATE_DIR/keep-alive.sh" << 'KEEPALIVE_EOF'
-#!/bin/bash
-# Keep sprite awake for 30 minutes by continuously outputting
-END_TIME=$(($(date +%s) + 1800))
-while [ $(date +%s) -lt $END_TIME ]; do
-    echo "[keep-alive] $(date)"
-    sleep 1
-done
-echo "[keep-alive] Session timeout, exiting"
-KEEPALIVE_EOF
-    chmod +x "$GATE_DIR/keep-alive.sh"
-
     cat > "$GATE_DIR/server.ts" << GATE_EOF
 const PORT = 8080;
 const TAILSCALE_URL = "${TAILSCALE_SERVE_URL}";
@@ -1364,41 +1351,34 @@ const html = \`<!DOCTYPE html>
 </body>
 </html>\`;
 
-async function startKeepAlive() {
-  try {
-    // Restart the keep-alive service using sprite-env
-    // This creates a proper detachable session that keeps the sprite awake
-
-    // Delete existing service if running
-    Bun.spawn(["sprite-env", "services", "delete", "sprite-keepalive"], {
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Create new keep-alive service
-    Bun.spawn(["sprite-env", "services", "create", "sprite-keepalive",
-      "--cmd", "${GATE_DIR}/keep-alive.sh",
-      "--no-stream"
-    ], {
-      stdout: "inherit",
-      stderr: "inherit",
-    });
-
-    console.log("[gate] Started keep-alive service (30min timeout)");
-  } catch (e) {
-    console.error("[gate] Failed to start keep-alive:", e);
-  }
-}
-
 const server = Bun.serve({
   port: PORT,
   async fetch() {
-    // Start keep-alive to ensure sprite stays awake
-    startKeepAlive();
+    // Return streaming response to keep HTTP connection open
+    // This keeps the sprite awake for 30 minutes
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Send the HTML immediately
+        controller.enqueue(new TextEncoder().encode(html));
 
-    return new Response(html, {
+        // Keep connection open for 30 minutes with periodic chunks
+        const endTime = Date.now() + 30 * 60 * 1000; // 30 minutes
+        const keepAlive = setInterval(() => {
+          if (Date.now() >= endTime) {
+            clearInterval(keepAlive);
+            controller.close();
+            console.log("[gate] Keep-alive timeout, closing connection");
+          } else {
+            // Send invisible HTML comment to keep connection alive
+            controller.enqueue(new TextEncoder().encode("<!-- keepalive -->"));
+          }
+        }, 10000); // Every 10 seconds
+
+        console.log("[gate] Started streaming keep-alive (30min timeout)");
+      }
+    });
+
+    return new Response(stream, {
       headers: { "Content-Type": "text/html" },
     });
   },
