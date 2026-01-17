@@ -1265,94 +1265,72 @@ const html = \`<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Connecting...</title>
+  <title>Sprite Code</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #1a1a2e;
-      color: #fff;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
     }
-    .container {
-      text-align: center;
-      padding: 2rem;
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
     }
-    .emoji {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-      filter: sepia(1) saturate(5) hue-rotate(70deg) brightness(1.1);
-    }
-    .blocked { display: none; }
-    .blocked .emoji { filter: none; }
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-    .spinner {
-      width: 24px;
-      height: 24px;
-      border: 3px solid #333;
-      border-top-color: #39ff14;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 1rem auto;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <div class="container" id="loading">
-    <div class="emoji">👾</div>
-    <h1>Connecting...</h1>
-    <div class="spinner"></div>
-  </div>
-  <div class="container blocked" id="blocked">
-    <div class="emoji">👾 🚫</div>
-    <h1>Unauthorized</h1>
-  </div>
+  <iframe src="\${TAILSCALE_URL}" allow="camera; microphone"></iframe>
   <script>
-    const tailscaleUrl = "\${TAILSCALE_URL}";
-    const maxRetries = 10;
-    const retryDelay = 2000;
-
-    async function tryConnect(attempt) {
-      try {
-        const r = await fetch(tailscaleUrl + '/api/config', {
-          mode: 'cors',
-          signal: AbortSignal.timeout(5000)
-        });
-        if (r.ok) {
-          window.location.href = tailscaleUrl;
-        } else {
-          throw new Error('not ok');
-        }
-      } catch (e) {
-        if (attempt < maxRetries) {
-          setTimeout(() => tryConnect(attempt + 1), retryDelay);
-        } else {
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('blocked').style.display = 'block';
-        }
-      }
-    }
-
-    if (!tailscaleUrl) {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('blocked').style.display = 'block';
-    } else {
-      tryConnect(1);
-    }
+    // Start keepalive connection immediately
+    fetch('/keepalive').catch(() => {
+      console.log('[gate] Keepalive failed to start, retrying...');
+      setTimeout(() => fetch('/keepalive').catch(() => {}), 1000);
+    });
   </script>
 </body>
 </html>\`;
 
 const server = Bun.serve({
   port: PORT,
-  fetch() {
+  async fetch(req) {
+    const url = new URL(req.url);
+
+    // Keepalive endpoint - streams to keep sprite awake
+    if (url.pathname === '/keepalive') {
+      const stream = new ReadableStream({
+        start(controller) {
+          console.log("[gate] Keepalive connection opened");
+
+          // Send periodic chunks
+          const interval = setInterval(() => {
+            try {
+              controller.enqueue(new TextEncoder().encode("ping\\n"));
+            } catch (e) {
+              clearInterval(interval);
+            }
+          }, 15000); // Every 15 seconds
+
+          // Cleanup on disconnect
+          req.signal.addEventListener('abort', () => {
+            clearInterval(interval);
+            controller.close();
+            console.log("[gate] Keepalive connection closed");
+          });
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/plain",
+          "Cache-Control": "no-cache",
+          "X-Accel-Buffering": "no"
+        },
+      });
+    }
+
+    // Main page with iframe
     return new Response(html, {
       headers: { "Content-Type": "text/html" },
     });
@@ -1360,7 +1338,7 @@ const server = Bun.serve({
 });
 
 console.log("Tailnet gate running on http://localhost:" + PORT);
-console.log("Redirects to: " + (TAILSCALE_URL || "(not configured)"));
+console.log("Embeds Tailscale URL in iframe: " + (TAILSCALE_URL || "(not configured)"));
 GATE_EOF
 
     # Check if gate service is running
