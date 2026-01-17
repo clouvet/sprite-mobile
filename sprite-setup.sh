@@ -1334,7 +1334,7 @@ const html = \`<!DOCTYPE html>
         iframe.style.display = 'none';
         unauthorized.classList.add('visible');
       }
-    }, 10000); // 10 second timeout
+    }, 4000); // 4 second timeout
 
     // Update iframe when outer hash changes
     window.addEventListener('hashchange', () => {
