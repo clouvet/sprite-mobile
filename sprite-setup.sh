@@ -1256,6 +1256,10 @@ step_10_tailnet_gate() {
     # Always recreate the gate server (in case TAILSCALE_SERVE_URL changed)
     echo "Creating tailnet gate server..."
     mkdir -p "$GATE_DIR"
+
+    # Extract hostname from Tailscale URL for title
+    SPRITE_HOSTNAME=$(hostname)
+
     cat > "$GATE_DIR/server.ts" << GATE_EOF
 const PORT = 8080;
 const TAILSCALE_URL = "${TAILSCALE_SERVE_URL}";
@@ -1265,29 +1269,78 @@ const html = \`<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sprite Mobile</title>
+  <title>${SPRITE_HOSTNAME}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%;
       height: 100%;
       overflow: hidden;
+      background: #1a1a2e;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #fff;
     }
     iframe {
       width: 100%;
       height: 100%;
       border: none;
     }
+    #unauthorized {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #1a1a2e;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+      padding: 2rem;
+    }
+    #unauthorized.visible {
+      display: flex;
+    }
+    .emoji {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p {
+      color: #888;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
   <iframe id="app-frame" allow="camera; microphone"></iframe>
+  <div id="unauthorized">
+    <div class="emoji">👾 🚫</div>
+    <h1>Unauthorized</h1>
+    <p>You must be on the Tailscale network to access this sprite</p>
+  </div>
   <script>
     // Set iframe src with hash from current URL
     const tailscaleUrl = "\${TAILSCALE_URL}";
     const hash = window.location.hash;
     const iframe = document.getElementById('app-frame');
+    const unauthorized = document.getElementById('unauthorized');
+    let iframeLoaded = false;
+
     iframe.src = tailscaleUrl + hash;
+
+    // Detect if iframe fails to load (user not on tailnet)
+    const loadTimeout = setTimeout(() => {
+      if (!iframeLoaded) {
+        // No communication from iframe, assume unauthorized
+        iframe.style.display = 'none';
+        unauthorized.classList.add('visible');
+      }
+    }, 10000); // 10 second timeout
 
     // Update iframe when outer hash changes
     window.addEventListener('hashchange', () => {
@@ -1297,6 +1350,12 @@ const html = \`<!DOCTYPE html>
 
     // Update outer URL when iframe hash changes
     window.addEventListener('message', (event) => {
+      // Any message from iframe means it loaded successfully
+      if (!iframeLoaded) {
+        iframeLoaded = true;
+        clearTimeout(loadTimeout);
+      }
+
       if (event.data && event.data.type === 'hashchange' && event.data.hash !== undefined) {
         if (window.location.hash !== event.data.hash) {
           window.location.hash = event.data.hash;

@@ -8,11 +8,17 @@
     // Sync hash with parent window (if in iframe)
     const isInIframe = window.parent !== window;
     let notifyParentOfHashChange;
+    let notifyParentReady;
 
     if (isInIframe) {
       // Helper to notify parent of hash changes
       notifyParentOfHashChange = () => {
         window.parent.postMessage({ type: 'hashchange', hash: window.location.hash }, '*');
+      };
+
+      // Helper to notify parent that iframe is ready
+      notifyParentReady = () => {
+        window.parent.postMessage({ type: 'ready' }, '*');
       };
 
       // Notify parent when hash changes via hashchange event
@@ -29,6 +35,7 @@
     } else {
       // No-op when not in iframe
       notifyParentOfHashChange = () => {};
+      notifyParentReady = () => {};
     }
 
     // Elements
@@ -1811,8 +1818,15 @@
         const session = sessions.find(s => s.id === lastSessionId);
         if (session) {
           selectSession(session);
+        } else if (hashSessionId) {
+          // Session from hash not found, clear the hash
+          history.replaceState(null, '', location.pathname);
+          notifyParentOfHashChange();
         }
       }
+
+      // Notify parent that iframe is ready (for unauthorized detection)
+      notifyParentReady();
     }
 
     init();
