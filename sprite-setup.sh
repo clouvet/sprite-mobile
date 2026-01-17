@@ -492,7 +492,7 @@ load_config() {
 
 step_2_configuration() {
     echo ""
-    echo "=== Step 1: Configuration ==="
+    echo "=== Step 2: Configuration ==="
 
     # Ensure shell configs source ~/.sprite-config
     ensure_shell_config_sourcing
@@ -597,7 +597,7 @@ step_2_configuration() {
 
 step_3_claude() {
     echo ""
-    echo "=== Step 2: Claude CLI Authentication ==="
+    echo "=== Step 3: Claude CLI Authentication ==="
 
     CLAUDE_TOKEN_FILE="$HOME/.config/claude-code/token"
 
@@ -722,7 +722,7 @@ CLAUDE_EOF
 
 step_4_github() {
     echo ""
-    echo "=== Step 3: GitHub CLI Authentication ==="
+    echo "=== Step 4: GitHub CLI Authentication ==="
 
     # Save GH_TOKEN to ~/.sprite-config if provided (regardless of current auth status)
     if [ -n "$GH_TOKEN" ]; then
@@ -820,7 +820,7 @@ step_4_github() {
 
 step_5_flyctl() {
     echo ""
-    echo "=== Step 4: Fly.io CLI Installation ==="
+    echo "=== Step 5: Fly.io CLI Installation ==="
 
     # Set flyctl install location (constant path, handled by shell configs)
     export FLYCTL_INSTALL="/home/sprite/.fly"
@@ -870,7 +870,7 @@ step_5_flyctl() {
 
 step_6_sprites() {
     echo ""
-    echo "=== Step 5: Sprites CLI Installation ==="
+    echo "=== Step 1: Sprites CLI Installation ==="
 
     if command -v sprite &>/dev/null; then
         echo "Sprites CLI already installed"
@@ -1457,11 +1457,11 @@ show_summary() {
 # ============================================
 
 STEP_NAMES=(
+    "Sprites CLI"
     "Configuration"
     "Claude CLI auth"
     "GitHub CLI auth"
     "Fly.io CLI (flyctl)"
-    "Sprites CLI"
     "Tailscale"
     "Tailscale Serve (HTTPS)"
     "sprite-mobile"
@@ -1473,11 +1473,11 @@ STEP_NAMES=(
 run_step() {
     local step_num="$1"
     case "$step_num" in
-        1) step_2_configuration ;;
-        2) step_3_claude ;;
-        3) step_4_github ;;
-        4) step_5_flyctl ;;
-        5) step_6_sprites ;;
+        1) step_6_sprites ;;
+        2) step_2_configuration ;;
+        3) step_3_claude ;;
+        4) step_4_github ;;
+        5) step_5_flyctl ;;
         6) step_7_tailscale ;;
         7) step_9_tailscale_serve ;;
         8) step_8_sprite_mobile ;;
@@ -1494,11 +1494,11 @@ show_menu() {
     echo "============================================"
     echo ""
     echo "Available steps:"
-    echo "   1.   Configuration (URLs, repo, git)"
-    echo "   2.   Claude CLI authentication"
-    echo "   3.   GitHub CLI authentication"
-    echo "   4.   Fly.io CLI (flyctl) installation"
-    echo "   5.   Sprites CLI installation"
+    echo "   1.   Sprites CLI installation"
+    echo "   2.   Configuration (URLs, repo, git)"
+    echo "   3.   Claude CLI authentication"
+    echo "   4.   GitHub CLI authentication"
+    echo "   5.   Fly.io CLI (flyctl) installation"
     echo "   6.   Tailscale installation"
     echo "   7.   Tailscale Serve (HTTPS for PWA)"
     echo "   8.   sprite-mobile setup"
@@ -1534,11 +1534,11 @@ parse_step_range() {
 }
 
 run_all_steps() {
+    step_6_sprites
     step_2_configuration
     step_3_claude
     step_4_github
     step_5_flyctl
-    step_6_sprites
     step_7_tailscale
     step_9_tailscale_serve
     step_8_sprite_mobile
