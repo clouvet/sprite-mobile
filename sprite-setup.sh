@@ -1265,7 +1265,7 @@ const html = \`<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sprite Code</title>
+  <title>Sprite Mobile</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -1283,11 +1283,16 @@ const html = \`<!DOCTYPE html>
 <body>
   <iframe src="\${TAILSCALE_URL}" allow="camera; microphone"></iframe>
   <script>
-    // Start keepalive connection immediately
-    fetch('/keepalive').catch(() => {
-      console.log('[gate] Keepalive failed to start, retrying...');
-      setTimeout(() => fetch('/keepalive').catch(() => {}), 1000);
-    });
+    // Ping keepalive endpoint every 10 seconds
+    function ping() {
+      fetch('/keepalive', { cache: 'no-store' })
+        .then(() => console.log('[gate] Keepalive ping OK'))
+        .catch(() => console.log('[gate] Keepalive ping failed'));
+    }
+
+    // Start immediately and repeat
+    ping();
+    setInterval(ping, 10000);
   </script>
 </body>
 </html>\`;
@@ -1297,35 +1302,12 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
 
-    // Keepalive endpoint - streams to keep sprite awake
+    // Keepalive endpoint - simple response to keep sprite awake
     if (url.pathname === '/keepalive') {
-      const stream = new ReadableStream({
-        start(controller) {
-          console.log("[gate] Keepalive connection opened");
-
-          // Send periodic chunks
-          const interval = setInterval(() => {
-            try {
-              controller.enqueue(new TextEncoder().encode("ping\\n"));
-            } catch (e) {
-              clearInterval(interval);
-            }
-          }, 15000); // Every 15 seconds
-
-          // Cleanup on disconnect
-          req.signal.addEventListener('abort', () => {
-            clearInterval(interval);
-            controller.close();
-            console.log("[gate] Keepalive connection closed");
-          });
-        }
-      });
-
-      return new Response(stream, {
+      return new Response("pong", {
         headers: {
           "Content-Type": "text/plain",
-          "Cache-Control": "no-cache",
-          "X-Accel-Buffering": "no"
+          "Cache-Control": "no-cache"
         },
       });
     }
