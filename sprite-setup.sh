@@ -1352,7 +1352,20 @@ const html = \`<!DOCTYPE html>
 
 const server = Bun.serve({
   port: PORT,
-  fetch() {
+  async fetch() {
+    // Wake up sprite-mobile by making a backend request
+    // This ensures the sprite stays awake for the client's Tailscale connection
+    try {
+      await fetch("http://localhost:8081/api/config", {
+        signal: AbortSignal.timeout(2000)
+      }).catch(() => {
+        // Ignore errors - sprite-mobile might not be ready yet
+        // The client-side JavaScript will retry
+      });
+    } catch (e) {
+      // Ignore timeout or other errors
+    }
+
     return new Response(html, {
       headers: { "Content-Type": "text/html" },
     });
