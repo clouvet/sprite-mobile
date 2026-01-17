@@ -1256,6 +1256,20 @@ step_10_tailnet_gate() {
     # Always recreate the gate server (in case TAILSCALE_SERVE_URL changed)
     echo "Creating tailnet gate server..."
     mkdir -p "$GATE_DIR"
+
+    # Create keep-alive script
+    cat > "$GATE_DIR/keep-alive.sh" << 'KEEPALIVE_EOF'
+#!/bin/bash
+# Keep sprite awake for 30 minutes by continuously outputting
+END_TIME=$(($(date +%s) + 1800))
+while [ $(date +%s) -lt $END_TIME ]; do
+    echo "[keep-alive] $(date)"
+    sleep 1
+done
+echo "[keep-alive] Session timeout, exiting"
+KEEPALIVE_EOF
+    chmod +x "$GATE_DIR/keep-alive.sh"
+
     cat > "$GATE_DIR/server.ts" << GATE_EOF
 const PORT = 8080;
 const TAILSCALE_URL = "${TAILSCALE_SERVE_URL}";
@@ -1350,9 +1364,33 @@ const html = \`<!DOCTYPE html>
 </body>
 </html>\`;
 
+let keepAliveProcess: ReturnType<typeof Bun.spawn> | null = null;
+
+function startKeepAlive() {
+  // Kill existing keep-alive process if running
+  if (keepAliveProcess) {
+    try {
+      keepAliveProcess.kill();
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  // Spawn new keep-alive process
+  keepAliveProcess = Bun.spawn(["bash", "${GATE_DIR}/keep-alive.sh"], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  console.log("[gate] Started keep-alive process (30min timeout)");
+}
+
 const server = Bun.serve({
   port: PORT,
   fetch() {
+    // Start keep-alive to ensure sprite stays awake
+    startKeepAlive();
+
     return new Response(html, {
       headers: { "Content-Type": "text/html" },
     });
