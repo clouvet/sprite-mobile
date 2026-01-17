@@ -1364,30 +1364,37 @@ const html = \`<!DOCTYPE html>
 </body>
 </html>\`;
 
-let keepAliveProcess: ReturnType<typeof Bun.spawn> | null = null;
+async function startKeepAlive() {
+  try {
+    // Restart the keep-alive service using sprite-env
+    // This creates a proper detachable session that keeps the sprite awake
 
-function startKeepAlive() {
-  // Kill existing keep-alive process if running
-  if (keepAliveProcess) {
-    try {
-      keepAliveProcess.kill();
-    } catch (e) {
-      // Ignore errors
-    }
+    // Delete existing service if running
+    Bun.spawn(["sprite-env", "services", "delete", "sprite-keepalive"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Create new keep-alive service
+    Bun.spawn(["sprite-env", "services", "create", "sprite-keepalive",
+      "--cmd", "${GATE_DIR}/keep-alive.sh",
+      "--no-stream"
+    ], {
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+
+    console.log("[gate] Started keep-alive service (30min timeout)");
+  } catch (e) {
+    console.error("[gate] Failed to start keep-alive:", e);
   }
-
-  // Spawn new keep-alive process
-  keepAliveProcess = Bun.spawn(["bash", "${GATE_DIR}/keep-alive.sh"], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-
-  console.log("[gate] Started keep-alive process (30min timeout)");
 }
 
 const server = Bun.serve({
   port: PORT,
-  fetch() {
+  async fetch() {
     // Start keep-alive to ensure sprite stays awake
     startKeepAlive();
 
