@@ -497,6 +497,33 @@ step_2_configuration() {
     # Ensure shell configs source ~/.sprite-config
     ensure_shell_config_sourcing
 
+    # Auto-detect sprite public URL if not already set
+    if [ -z "$SPRITE_PUBLIC_URL" ]; then
+        CURRENT_HOSTNAME=$(hostname)
+
+        # Only auto-detect if hostname is not "sprite"
+        if [ "$CURRENT_HOSTNAME" != "sprite" ]; then
+            echo "Attempting to auto-detect sprite public URL..."
+
+            # Try to get public URL from sprite API
+            API_RESPONSE=$(sprite api /v1/sprites/"$CURRENT_HOSTNAME" 2>/dev/null || echo "")
+
+            if [ -n "$API_RESPONSE" ]; then
+                # Extract url from JSON response (simple grep/sed approach)
+                AUTO_DETECTED_URL=$(echo "$API_RESPONSE" | grep -o '"url"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"\([^"]*\)".*/\1/' | head -1)
+
+                if [ -n "$AUTO_DETECTED_URL" ]; then
+                    SPRITE_PUBLIC_URL="$AUTO_DETECTED_URL"
+                    echo "Auto-detected public URL: $SPRITE_PUBLIC_URL"
+                else
+                    echo "Could not parse public URL from API response"
+                fi
+            else
+                echo "Could not fetch sprite information from API"
+            fi
+        fi
+    fi
+
     # Prompt for URLs and repo (skip prompts in non-interactive mode)
     if [ "$NON_INTERACTIVE" != "true" ]; then
         read -p "Sprite public URL (optional) [$SPRITE_PUBLIC_URL]: " input_url
