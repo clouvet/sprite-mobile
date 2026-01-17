@@ -1315,6 +1315,11 @@ const html = \`<!DOCTYPE html>
     <div class="emoji">👾 🚫</div>
     <h1>Unauthorized</h1>
   </div>
+  <div class="container" id="connected" style="display: none;">
+    <div class="emoji">👾 ✓</div>
+    <h1>Connected!</h1>
+    <p style="margin-top: 1rem; color: #aaa;">Keep this window open</p>
+  </div>
   <script>
     const tailscaleUrl = "\${TAILSCALE_URL}";
     const maxRetries = 10;
@@ -1327,7 +1332,10 @@ const html = \`<!DOCTYPE html>
           signal: AbortSignal.timeout(5000)
         });
         if (r.ok) {
-          window.location.href = tailscaleUrl;
+          // Open in new window to keep this connection alive
+          window.open(tailscaleUrl, '_blank');
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('connected').style.display = 'block';
         } else {
           throw new Error('not ok');
         }
