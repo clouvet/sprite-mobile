@@ -1256,7 +1256,6 @@ step_10_tailnet_gate() {
     # Always recreate the gate server (in case TAILSCALE_SERVE_URL changed)
     echo "Creating tailnet gate server..."
     mkdir -p "$GATE_DIR"
-
     cat > "$GATE_DIR/server.ts" << GATE_EOF
 const PORT = 8080;
 const TAILSCALE_URL = "${TAILSCALE_SERVE_URL}";
@@ -1320,9 +1319,6 @@ const html = \`<!DOCTYPE html>
     const maxRetries = 10;
     const retryDelay = 2000;
 
-    // Start keepalive connection immediately to keep sprite awake during redirect
-    fetch('/keepalive').catch(() => {});
-
     async function tryConnect(attempt) {
       try {
         const r = await fetch(tailscaleUrl + '/api/config', {
@@ -1330,7 +1326,6 @@ const html = \`<!DOCTYPE html>
           signal: AbortSignal.timeout(5000)
         });
         if (r.ok) {
-          // Redirect to tailscale URL (sprite-mobile will take over keepalive)
           window.location.href = tailscaleUrl;
         } else {
           throw new Error('not ok');
@@ -1357,43 +1352,7 @@ const html = \`<!DOCTYPE html>
 
 const server = Bun.serve({
   port: PORT,
-  async fetch(req) {
-    const url = new URL(req.url);
-
-    // Keep-alive endpoint for sprite-mobile to call
-    if (url.pathname === '/keepalive') {
-      const stream = new ReadableStream({
-        start(controller) {
-          console.log("[gate] Keep-alive connection opened");
-
-          // Send periodic chunks to keep connection alive
-          const interval = setInterval(() => {
-            try {
-              controller.enqueue(new TextEncoder().encode("ping\\n"));
-            } catch (e) {
-              clearInterval(interval);
-            }
-          }, 15000); // Every 15 seconds
-
-          // Cleanup when client disconnects
-          req.signal.addEventListener('abort', () => {
-            clearInterval(interval);
-            controller.close();
-            console.log("[gate] Keep-alive connection closed");
-          });
-        }
-      });
-
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/plain",
-          "Cache-Control": "no-cache",
-          "X-Accel-Buffering": "no"
-        },
-      });
-    }
-
-    // Regular gate page
+  fetch() {
     return new Response(html, {
       headers: { "Content-Type": "text/html" },
     });
