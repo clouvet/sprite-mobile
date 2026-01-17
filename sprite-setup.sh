@@ -1308,11 +1308,6 @@ const html = \`<!DOCTYPE html>
     }
     h1 {
       font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-    p {
-      color: #888;
-      font-size: 0.9rem;
     }
   </style>
 </head>
@@ -1321,7 +1316,6 @@ const html = \`<!DOCTYPE html>
   <div id="unauthorized">
     <div class="emoji">👾 🚫</div>
     <h1>Unauthorized</h1>
-    <p>You must be on the Tailscale network to access this sprite</p>
   </div>
   <script>
     // Set iframe src with hash from current URL
