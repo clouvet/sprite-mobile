@@ -1287,28 +1287,19 @@ const html = \`<!DOCTYPE html>
     const tailscaleUrl = "\${TAILSCALE_URL}";
     const hash = window.location.hash;
     const iframe = document.getElementById('app-frame');
-    console.log('[gate] Initial hash:', hash);
-    console.log('[gate] Setting iframe src to:', tailscaleUrl + hash);
     iframe.src = tailscaleUrl + hash;
 
     // Update iframe when outer hash changes
     window.addEventListener('hashchange', () => {
       const newHash = window.location.hash;
-      console.log('[gate] Outer hash changed to:', newHash);
-      console.log('[gate] Sending postMessage to iframe');
       iframe.contentWindow.postMessage({ type: 'hashchange', hash: newHash }, '*');
     });
 
     // Update outer URL when iframe hash changes
     window.addEventListener('message', (event) => {
-      console.log('[gate] Received message:', event.data, 'from origin:', event.origin);
       if (event.data && event.data.type === 'hashchange' && event.data.hash !== undefined) {
-        console.log('[gate] iframe sent new hash:', event.data.hash);
         if (window.location.hash !== event.data.hash) {
-          console.log('[gate] Updating outer URL hash to:', event.data.hash);
           window.location.hash = event.data.hash;
-        } else {
-          console.log('[gate] Hash already matches, no update needed');
         }
       }
     });

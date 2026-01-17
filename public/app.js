@@ -10,37 +10,23 @@
     let notifyParentOfHashChange;
 
     if (isInIframe) {
-      console.log('[iframe] Detected running in iframe, enabling hash sync');
-      console.log('[iframe] Initial hash:', window.location.hash);
-
       // Helper to notify parent of hash changes
       notifyParentOfHashChange = () => {
-        const hash = window.location.hash;
-        console.log('[iframe] Notifying parent of hash:', hash);
-        window.parent.postMessage({ type: 'hashchange', hash: hash }, '*');
+        window.parent.postMessage({ type: 'hashchange', hash: window.location.hash }, '*');
       };
 
       // Notify parent when hash changes via hashchange event
-      window.addEventListener('hashchange', () => {
-        console.log('[iframe] hashchange event fired, hash:', window.location.hash);
-        notifyParentOfHashChange();
-      });
+      window.addEventListener('hashchange', notifyParentOfHashChange);
 
       // Listen for hash changes from parent
       window.addEventListener('message', (event) => {
-        console.log('[iframe] Received message from parent:', event.data);
         if (event.data && event.data.type === 'hashchange' && event.data.hash !== undefined) {
-          console.log('[iframe] Parent sent new hash:', event.data.hash);
           if (window.location.hash !== event.data.hash) {
-            console.log('[iframe] Updating hash to:', event.data.hash);
             window.location.hash = event.data.hash;
-          } else {
-            console.log('[iframe] Hash already matches, no update needed');
           }
         }
       });
     } else {
-      console.log('[iframe] NOT in iframe, hash sync disabled');
       // No-op when not in iframe
       notifyParentOfHashChange = () => {};
     }
@@ -500,7 +486,6 @@
       // Update URL hash to persist session across refreshes
       history.replaceState(null, '', `#session=${session.id}`);
       // Manually notify parent since history.replaceState doesn't trigger hashchange
-      console.log('[iframe] Called history.replaceState with session:', session.id);
       notifyParentOfHashChange();
     }
 
@@ -517,7 +502,6 @@
       // Clear URL hash when no session selected
       history.replaceState(null, '', location.pathname);
       // Manually notify parent since history.replaceState doesn't trigger hashchange
-      console.log('[iframe] Called history.replaceState to clear hash');
       notifyParentOfHashChange();
     }
 
