@@ -1494,7 +1494,7 @@
           try {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(`${tailscaleUrl}/api/config`, {
+            const res = await fetch(`${publicUrl}/api/config`, {
               signal: controller.signal,
               cache: 'no-store'
             });
