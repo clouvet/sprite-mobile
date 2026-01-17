@@ -1508,7 +1508,17 @@
 
       if (switchingSubtext) switchingSubtext.textContent = 'Navigating...';
       await new Promise(r => setTimeout(r, 300));
-      window.location.href = tailscaleUrl;
+
+      // Navigate based on iframe context
+      if (isInIframe && publicUrl) {
+        // In iframe: navigate parent window to public URL (updates address bar)
+        console.log('[iframe] Navigating parent to public URL:', publicUrl);
+        window.parent.location.href = publicUrl;
+      } else {
+        // Not in iframe: navigate directly to Tailscale URL
+        console.log('Navigating to Tailscale URL:', tailscaleUrl);
+        window.location.href = tailscaleUrl;
+      }
     }
 
     // Check network status on startup
