@@ -1314,61 +1314,14 @@
       const protocol = location.protocol;
       const targetUrl = `${protocol}//${address}:${port}`;
 
-      // If we have a publicUrl, try to wake the sprite first
-      if (publicUrl) {
-        // Show switching overlay
-        const switchingText = switchingOverlay.querySelector('.switching-text');
-        const switchingSubtext = switchingOverlay.querySelector('.switching-subtext');
-        if (switchingText) switchingText.textContent = 'Switching to sprite...';
-        if (switchingSubtext) switchingSubtext.textContent = 'Waking up the target sprite';
-        switchingOverlay.classList.add('visible');
+      // Close the sprites modal
+      closeSpritesModalFn();
 
-        // Close the sprites modal
-        closeSpritesModalFn();
-
-        // Ping the public URL to wake the sprite
-        console.log('Waking sprite via publicUrl:', publicUrl);
-        try {
-          await fetch(publicUrl, { mode: 'no-cors', cache: 'no-store' });
-        } catch (err) {
-          // Expected with no-cors
-        }
-
-        // Wait for sprite to respond (try pinging the direct address)
-        if (switchingSubtext) switchingSubtext.textContent = 'Waiting for sprite to respond...';
-
-        let spriteReady = false;
-        for (let i = 0; i < 15; i++) {
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(`${targetUrl}/api/config`, {
-              signal: controller.signal,
-              cache: 'no-store'
-            });
-            clearTimeout(timeout);
-            if (res.ok) {
-              spriteReady = true;
-              break;
-            }
-          } catch (err) {
-            // Keep trying
-          }
-          if (switchingSubtext) switchingSubtext.textContent = `Waiting for sprite... (${i + 1}/15)`;
-          await new Promise(r => setTimeout(r, 1000));
-        }
-
-        if (spriteReady) {
-          if (switchingSubtext) switchingSubtext.textContent = 'Sprite ready, navigating...';
-        } else {
-          if (switchingSubtext) switchingSubtext.textContent = 'Navigating anyway...';
-        }
-
-        // Small delay for visual feedback
-        await new Promise(r => setTimeout(r, 300));
-      }
-
-      window.location.href = targetUrl;
+      // Navigate immediately - if publicUrl exists, use it (tailnet-gate handles wake)
+      // Otherwise navigate to direct URL
+      const navigationUrl = publicUrl || targetUrl;
+      console.log('Switching to sprite:', navigationUrl);
+      window.location.href = navigationUrl;
     }
 
     // Make deleteSprite global for onclick
@@ -1474,49 +1427,22 @@
     }
 
     async function navigateToNetworkSprite(tailscaleUrl, publicUrl) {
-      // Show switching overlay
-      const switchingText = switchingOverlay.querySelector('.switching-text');
-      const switchingSubtext = switchingOverlay.querySelector('.switching-subtext');
-      if (switchingText) switchingText.textContent = 'Switching to sprite...';
-      if (switchingSubtext) switchingSubtext.textContent = 'Waking up the target sprite';
-      switchingOverlay.classList.add('visible');
+      // Close the sprites modal
       closeSpritesModalFn();
 
-      // Wake via public URL if available
-      if (publicUrl) {
-        try {
-          await fetch(publicUrl, { mode: 'no-cors', cache: 'no-store' });
-        } catch {}
-
-        // Wait for sprite to respond
-        if (switchingSubtext) switchingSubtext.textContent = 'Waiting for sprite to respond...';
-        for (let i = 0; i < 15; i++) {
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(`${publicUrl}/api/config`, {
-              signal: controller.signal,
-              cache: 'no-store'
-            });
-            clearTimeout(timeout);
-            if (res.ok) break;
-          } catch {}
-          if (switchingSubtext) switchingSubtext.textContent = `Waiting for sprite... (${i + 1}/15)`;
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      }
-
-      if (switchingSubtext) switchingSubtext.textContent = 'Navigating...';
-      await new Promise(r => setTimeout(r, 300));
-
-      // Navigate based on iframe context
+      // Navigate immediately - publicUrl if in iframe or available, otherwise Tailscale URL
+      // The tailnet-gate at publicUrl handles sprite wake-up automatically
       if (isInIframe && publicUrl) {
         // In iframe: navigate parent window to public URL (updates address bar)
-        console.log('[iframe] Navigating parent to public URL:', publicUrl);
+        console.log('[iframe] Switching to sprite via public URL:', publicUrl);
         window.parent.location.href = publicUrl;
+      } else if (publicUrl) {
+        // Not in iframe but have public URL: use it
+        console.log('Switching to sprite via public URL:', publicUrl);
+        window.location.href = publicUrl;
       } else {
-        // Not in iframe: navigate directly to Tailscale URL
-        console.log('Navigating to Tailscale URL:', tailscaleUrl);
+        // No public URL: navigate directly to Tailscale URL
+        console.log('Switching to sprite via Tailscale URL:', tailscaleUrl);
         window.location.href = tailscaleUrl;
       }
     }
