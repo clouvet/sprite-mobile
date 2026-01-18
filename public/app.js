@@ -1619,7 +1619,6 @@
       if (e.target === externalSessionsModal) closeExternalSessionsModalFn();
     });
 
-    // Pull to refresh
     let pullStartY = 0;
     let isPulling = false;
     let pullDistance = 0;

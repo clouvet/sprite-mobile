@@ -1136,7 +1136,6 @@
       gap: 12px;
     }
 
-    /* Pull to refresh */
     #pull-indicator {
       position: fixed;
       top: var(--safe-top);
