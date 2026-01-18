@@ -509,12 +509,59 @@ step_2_configuration() {
     # Ensure shell configs source ~/.sprite-config
     ensure_shell_config_sourcing
 
+    # Check and update hostname if it's "sprite"
+    CURRENT_HOSTNAME=$(hostname)
+    if [ "$CURRENT_HOSTNAME" = "sprite" ]; then
+        # Try to determine the actual sprite name
+        DETECTED_SPRITE_NAME=""
+
+        # Method 1: Use SPRITE_NAME if provided via --name
+        if [ -n "$SPRITE_NAME" ]; then
+            DETECTED_SPRITE_NAME="$SPRITE_NAME"
+            echo "Using sprite name from --name argument: $DETECTED_SPRITE_NAME"
+
+        # Method 2: Extract from SPRITE_PUBLIC_URL if available
+        elif [ -n "$SPRITE_PUBLIC_URL" ]; then
+            # Extract hostname from URL (e.g., https://sad-clown.fly.dev -> sad-clown)
+            DETECTED_SPRITE_NAME=$(echo "$SPRITE_PUBLIC_URL" | sed -E 's|^https?://([^./]+).*|\1|')
+            if [ -n "$DETECTED_SPRITE_NAME" ]; then
+                echo "Extracted sprite name from public URL: $DETECTED_SPRITE_NAME"
+            fi
+
+        # Method 3: Try to get from sprite whoami
+        else
+            WHOAMI_RESPONSE=$(sprite whoami 2>/dev/null || echo "")
+            if [ -n "$WHOAMI_RESPONSE" ]; then
+                # Try to extract sprite name from whoami output
+                DETECTED_SPRITE_NAME=$(echo "$WHOAMI_RESPONSE" | grep -o 'sprite:[[:space:]]*[^[:space:]]*' | sed 's/sprite:[[:space:]]*//' | head -1)
+                if [ -n "$DETECTED_SPRITE_NAME" ]; then
+                    echo "Detected sprite name from 'sprite whoami': $DETECTED_SPRITE_NAME"
+                fi
+            fi
+        fi
+
+        # Change hostname if we detected a sprite name
+        if [ -n "$DETECTED_SPRITE_NAME" ]; then
+            echo "Changing hostname from 'sprite' to '$DETECTED_SPRITE_NAME'..."
+            if sudo hostname "$DETECTED_SPRITE_NAME" 2>/dev/null; then
+                echo "Hostname changed to: $DETECTED_SPRITE_NAME"
+                CURRENT_HOSTNAME="$DETECTED_SPRITE_NAME"
+
+                # Update /etc/hostname to persist across reboots
+                echo "$DETECTED_SPRITE_NAME" | sudo tee /etc/hostname > /dev/null
+                echo "Updated /etc/hostname for persistence"
+            else
+                echo "Warning: Could not change hostname (may require permissions)"
+            fi
+        else
+            echo "Could not determine sprite name, keeping hostname as 'sprite'"
+        fi
+    fi
+
     # Auto-detect sprite public URL if not already set
     URL_AUTO_DETECTED=false
     if [ -z "$SPRITE_PUBLIC_URL" ]; then
-        CURRENT_HOSTNAME=$(hostname)
-
-        # Only auto-detect if hostname is not "sprite"
+        # Try to get public URL from sprite API using current hostname
         if [ "$CURRENT_HOSTNAME" != "sprite" ]; then
             echo "Attempting to auto-detect sprite public URL..."
 
