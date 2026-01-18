@@ -92,7 +92,7 @@ echo ""
 # Step 5: Run setup script
 echo "Step 5: Running setup script (this may take 3-5 minutes)..."
 echo ""
-sprite -s "$SPRITE_NAME" -o "$ORG" exec -- bash -c "set -a && source ~/.sprite-config && set +a && export NON_INTERACTIVE=true && cd ~ && ./sprite-setup.sh all"
+sprite -s "$SPRITE_NAME" -o "$ORG" exec -- bash -c "set -a && source ~/.sprite-config && set +a && export NON_INTERACTIVE=true && cd ~ && ./sprite-setup.sh --name '$SPRITE_NAME' all"
 echo ""
 
 # Step 6: Verify services
