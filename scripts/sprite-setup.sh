@@ -1257,7 +1257,7 @@ step_8_sprite_mobile() {
     echo "Starting sprite-mobile service on port $APP_PORT..."
     # Use wrapper script that sources .zshrc to avoid logging tokens
     sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
-      \"cmd\": \"$SPRITE_MOBILE_DIR/start-service.sh\"
+      \"cmd\": \"$SPRITE_MOBILE_DIR/scripts/start-service.sh\"
     }"
 }
 
@@ -1290,7 +1290,7 @@ step_9_tailscale_serve() {
             sprite_api -X DELETE '/v1/services/sprite-mobile' 2>/dev/null || true
             sleep 2
             sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
-              \"cmd\": \"$SPRITE_MOBILE_DIR/start-service.sh\"
+              \"cmd\": \"$SPRITE_MOBILE_DIR/scripts/start-service.sh\"
             }"
             echo "  sprite-mobile restarted"
         fi
@@ -1720,7 +1720,7 @@ run_all_steps() {
         sprite_api -X DELETE '/v1/services/sprite-mobile' 2>/dev/null || true
         sleep 2
         sprite_api -X PUT '/v1/services/sprite-mobile?duration=3s' -d "{
-          \"cmd\": \"$SPRITE_MOBILE_DIR/start-service.sh\"
+          \"cmd\": \"$SPRITE_MOBILE_DIR/scripts/start-service.sh\"
         }"
         echo "sprite-mobile restarted"
     fi

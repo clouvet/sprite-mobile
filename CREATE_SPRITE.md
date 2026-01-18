@@ -7,7 +7,7 @@ This guide explains how to create and configure new sprites with sprite-mobile f
 From any sprite with sprite-mobile installed:
 
 ```bash
-~/.sprite-mobile/create-sprite.sh <sprite-name>
+~/.sprite-mobile/scripts/create-sprite.sh <sprite-name>
 ```
 
 This single command will:
@@ -20,7 +20,7 @@ This single command will:
 ## Example
 
 ```bash
-~/.sprite-mobile/create-sprite.sh my-test-sprite
+~/.sprite-mobile/scripts/create-sprite.sh my-test-sprite
 ```
 
 ## What Gets Transferred
@@ -153,7 +153,7 @@ sprite auth setup --token "org/id/token/value"
 
 Create it from scratch:
 ```bash
-~/.sprite-mobile/sprite-setup.sh --export > ~/.sprite-config
+~/.sprite-mobile/scripts/sprite-setup.sh --export > ~/.sprite-config
 ```
 
 Or copy from another sprite:
@@ -212,9 +212,9 @@ The `create-sprite.sh` script is safe to test repeatedly:
 
 Test by creating a few sprites:
 ```bash
-~/.sprite-mobile/create-sprite.sh test-1
-~/.sprite-mobile/create-sprite.sh test-2
-~/.sprite-mobile/create-sprite.sh test-3
+~/.sprite-mobile/scripts/create-sprite.sh test-1
+~/.sprite-mobile/scripts/create-sprite.sh test-2
+~/.sprite-mobile/scripts/create-sprite.sh test-3
 ```
 
 All sprites will appear in your sprite network automatically!

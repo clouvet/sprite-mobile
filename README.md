@@ -173,7 +173,7 @@ Create a reusable auth key and add it to your `~/.sprite-config`:
 From any existing sprite-mobile sprite:
 
 ```bash
-~/.sprite-mobile/create-sprite.sh my-new-sprite
+~/.sprite-mobile/scripts/create-sprite.sh my-new-sprite
 ```
 
 **That's it!** This single command will:

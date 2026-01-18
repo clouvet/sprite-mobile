@@ -36,7 +36,7 @@ Public URL (https://sprite.fly.dev)
 
 - `sprite-mobile` (port 8081): Main app server, Claude Code chat interface
   - Location: `~/.sprite-mobile/`
-  - Started via: `~/.sprite-mobile/start-service.sh` (sources `~/.sprite-config`)
+  - Started via: `~/.sprite-mobile/scripts/start-service.sh` (sources `~/.sprite-config`)
   - Purpose: WebSocket-based chat interface with Claude Code in YOLO mode
 
 - `tailscaled`: Tailscale daemon for secure network access
@@ -191,7 +191,7 @@ sprite create $NEW_SPRITE
 sprite url update --auth public -s $NEW_SPRITE
 
 # 3. Export config and run setup on the new sprite
-~/.sprite-mobile/sprite-setup.sh --export | \
+~/.sprite-mobile/scripts/sprite-setup.sh --export | \
   sprite -s $NEW_SPRITE exec bash -c "
     curl -fsSL https://raw.githubusercontent.com/clouvet/sprite-mobile/main/sprite-setup.sh -o ~/sprite-setup.sh
     chmod +x ~/sprite-setup.sh
@@ -220,7 +220,7 @@ The `--export` config includes:
 
 ```bash
 # Export current sprite's config
-~/.sprite-mobile/sprite-setup.sh --export > config.json
+~/.sprite-mobile/scripts/sprite-setup.sh --export > config.json
 
 # Run non-interactively with config file
 ./sprite-setup.sh --config config.json all
@@ -359,7 +359,7 @@ tailscale serve status
 ### Regenerating tailnet-gate
 ```bash
 cd ~/.sprite-mobile
-./sprite-setup.sh 10
+./scripts/sprite-setup.sh 10
 ```
 
 This regenerates the tailnet-gate server with the current Tailscale serve URL.
@@ -410,8 +410,8 @@ Connect to `/ws?session={sessionId}` for real-time chat.
 **Project location**: `~/.sprite-mobile/`
 **Configuration**: `~/.sprite-config`
 **Data directory**: `~/.sprite-mobile/data/`
-**Setup script**: `~/.sprite-mobile/sprite-setup.sh`
-**Service wrapper**: `~/.sprite-mobile/start-service.sh`
+**Setup script**: `~/.sprite-mobile/scripts/sprite-setup.sh`
+**Service wrapper**: `~/.sprite-mobile/scripts/start-service.sh`
 
 **Key files to know:**
 - `server.ts` - Main app server
