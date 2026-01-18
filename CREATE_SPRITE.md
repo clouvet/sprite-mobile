@@ -47,10 +47,10 @@ The setup script now automatically detects `~/.sprite-config` and enables non-in
 
 ```bash
 # Old way (manual)
-set -a && source ~/.sprite-config && set +a && export NON_INTERACTIVE=true && ~/sprite-setup.sh all
+set -a && source ~/.sprite-config && set +a && export NON_INTERACTIVE=true && ~/sprite-setup.sh --name <sprite-name> all
 
-# New way (automatic)
-~/sprite-setup.sh all
+# New way (automatic, config auto-detected)
+~/sprite-setup.sh --name <sprite-name> all
 ```
 
 If `~/.sprite-config` exists, the script will:
@@ -83,8 +83,9 @@ The `create-sprite.sh` script follows this flow:
    - curl sprite-setup.sh to new sprite
 
 6. Run setup
-   - sprite exec -- ./sprite-setup.sh all
+   - sprite exec -- ./sprite-setup.sh --name <sprite-name> all
    - Auto-detects ~/.sprite-config
+   - Sets hostname to sprite name
    - Runs completely non-interactively
 
 7. Verify
@@ -194,7 +195,7 @@ cat ~/.sprite-config | sprite -s my-sprite exec -- cat > ~/.sprite-config
 sprite -s my-sprite exec -- bash -c "
   curl -fsSL https://gist.githubusercontent.com/clouvet/901dabc09e62648fa394af65ad004d04/raw/sprite-setup.sh -o ~/sprite-setup.sh
   chmod +x ~/sprite-setup.sh
-  ~/sprite-setup.sh all
+  ~/sprite-setup.sh --name my-sprite all
 "
 ```
 
