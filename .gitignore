@@ -20,8 +20,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# Claude Code
+# Claude Code (except skills)
 .claude/
+!.claude/skills/
 
 # Bun
 *.lockb
