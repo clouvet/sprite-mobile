@@ -1317,6 +1317,8 @@ const html = \`<!DOCTYPE html>
     .emoji {
       font-size: 4rem;
       margin-bottom: 1rem;
+      transition: transform 0.3s ease-out;
+      will-change: transform;
     }
     h1 {
       font-size: 1.5rem;
@@ -1392,15 +1394,33 @@ const html = \`<!DOCTYPE html>
 
     // Pull-to-refresh on unauthorized page
     let touchStartY = 0;
-    let touchEndY = 0;
+    const emojiElement = document.querySelector('.emoji');
 
     unauthorized.addEventListener('touchstart', (e) => {
       touchStartY = e.touches[0].clientY;
     }, { passive: true });
 
+    unauthorized.addEventListener('touchmove', (e) => {
+      const touchCurrentY = e.touches[0].clientY;
+      const pullDistance = touchCurrentY - touchStartY;
+
+      if (pullDistance > 0) {
+        // Transform emoji based on pull distance (max at 150px)
+        const translateY = Math.min(pullDistance * 0.5, 75);
+        if (emojiElement) {
+          emojiElement.style.transform = \`translateY(\${translateY}px)\`;
+        }
+      }
+    }, { passive: true });
+
     unauthorized.addEventListener('touchend', (e) => {
       const touchEndY = e.changedTouches[0].clientY;
       const pullDistance = touchEndY - touchStartY;
+
+      // Reset emoji position
+      if (emojiElement) {
+        emojiElement.style.transform = 'translateY(0)';
+      }
 
       if (pullDistance > 100) {
         window.location.reload();
