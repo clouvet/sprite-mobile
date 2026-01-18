@@ -5,6 +5,7 @@ import { cleanupStaleProcesses } from "./lib/claude";
 import { handleApi } from "./routes/api";
 import { websocketHandlers, allClients } from "./routes/websocket";
 import { initNetwork, registerSprite, updateHeartbeat, buildSpriteRegistration, isNetworkEnabled } from "./lib/network";
+import { initTasksNetwork } from "./lib/distributed-tasks";
 
 // Load .env file if present
 const ENV_FILE = join(import.meta.dir, ".env");
@@ -125,6 +126,14 @@ if (networkEnabled) {
   setInterval(() => {
     updateHeartbeat().catch((err) => console.error("Heartbeat failed:", err));
   }, 5 * 60 * 1000);
+}
+
+// Initialize distributed tasks
+const tasksEnabled = initTasksNetwork();
+if (tasksEnabled) {
+  console.log("Distributed tasks enabled");
+} else {
+  console.log("Distributed tasks disabled (no credentials)");
 }
 
 // Watch public directory for changes and notify clients to reload

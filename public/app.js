@@ -1464,6 +1464,126 @@
       refreshNetworkBtn.addEventListener('click', loadNetworkSprites);
     }
 
+    // Tasks modal
+    const tasksBtn = document.getElementById('tasks-btn');
+    const tasksModal = document.getElementById('tasks-modal');
+    const closeTasksModal = document.getElementById('close-tasks-modal');
+    const refreshTasksBtn = document.getElementById('refresh-tasks-btn');
+    const myTasksList = document.getElementById('my-tasks-list');
+    const allTasksStatus = document.getElementById('all-tasks-status');
+    const allTasksList = document.getElementById('all-tasks-list');
+
+    function openTasksModal() {
+      loadTasks();
+      tasksModal.classList.add('open');
+    }
+
+    function closeTasksModalFn() {
+      tasksModal.classList.remove('open');
+    }
+
+    async function loadTasks() {
+      // Load my tasks
+      myTasksList.innerHTML = '<div class="loading">Loading...</div>';
+      try {
+        const res = await fetch('/api/distributed-tasks/mine');
+        const data = await res.json();
+
+        if (data.error) {
+          myTasksList.innerHTML = `<div class="empty">${escapeHtml(data.error)}</div>`;
+        } else {
+          const { current, queued } = data;
+          const myTasks = [current, ...queued].filter(Boolean);
+
+          if (myTasks.length === 0) {
+            myTasksList.innerHTML = '<div class="empty">No tasks assigned</div>';
+          } else {
+            myTasksList.innerHTML = myTasks.map(task => renderTask(task)).join('');
+          }
+        }
+      } catch (err) {
+        myTasksList.innerHTML = '<div class="error">Failed to load tasks</div>';
+      }
+
+      // Load all sprites status
+      allTasksStatus.innerHTML = '<div class="loading">Loading...</div>';
+      try {
+        const res = await fetch('/api/distributed-tasks/status');
+        const data = await res.json();
+
+        if (data.error) {
+          allTasksStatus.innerHTML = `<div class="empty">${escapeHtml(data.error)}</div>`;
+        } else {
+          if (data.sprites.length === 0) {
+            allTasksStatus.innerHTML = '<div class="empty">No sprites with tasks</div>';
+          } else {
+            allTasksStatus.innerHTML = data.sprites.map(sprite => `
+              <div class="sprite-status-item">
+                <div class="sprite-status-name">${escapeHtml(sprite.spriteName)}</div>
+                <div class="sprite-status-tasks">
+                  ${sprite.current ? `Working on: ${escapeHtml(sprite.current.title)}` : 'No current task'}
+                  ${sprite.queuedCount > 0 ? ` (${sprite.queuedCount} queued)` : ''}
+                </div>
+              </div>
+            `).join('');
+          }
+        }
+      } catch (err) {
+        allTasksStatus.innerHTML = '<div class="error">Failed to load status</div>';
+      }
+
+      // Load all tasks
+      allTasksList.innerHTML = '<div class="loading">Loading...</div>';
+      try {
+        const res = await fetch('/api/distributed-tasks');
+        const data = await res.json();
+
+        if (data.error) {
+          allTasksList.innerHTML = `<div class="empty">${escapeHtml(data.error)}</div>`;
+        } else {
+          if (data.tasks.length === 0) {
+            allTasksList.innerHTML = '<div class="empty">No tasks</div>';
+          } else {
+            allTasksList.innerHTML = data.tasks
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+              .map(task => renderTask(task)).join('');
+          }
+        }
+      } catch (err) {
+        allTasksList.innerHTML = '<div class="error">Failed to load tasks</div>';
+      }
+    }
+
+    function renderTask(task) {
+      const createdAt = new Date(task.createdAt);
+      const statusLabel = task.status.replace('_', ' ');
+
+      return `
+        <div class="task-item status-${task.status}">
+          <div class="task-title">${escapeHtml(task.title)}</div>
+          <div class="task-meta">
+            Assigned to: ${escapeHtml(task.assignedTo)} by ${escapeHtml(task.assignedBy)} |
+            Status: ${statusLabel} |
+            Created: ${formatTime(createdAt.getTime())}
+          </div>
+          ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
+          ${task.result ? `
+            <div class="task-result">
+              <strong>${task.result.success ? '✓ Completed' : '✗ Failed'}:</strong> ${escapeHtml(task.result.summary)}
+              ${task.result.error ? `<br><span style="color: #ef4444">${escapeHtml(task.result.error)}</span>` : ''}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    tasksBtn.addEventListener('click', openTasksModal);
+    closeTasksModal.addEventListener('click', closeTasksModalFn);
+    tasksModal.addEventListener('click', (e) => {
+      if (e.target === tasksModal) closeTasksModalFn();
+    });
+    refreshTasksBtn.addEventListener('click', loadTasks);
+
     // External sessions modal (attach to CLI sessions)
     function openExternalSessionsModal() {
       externalSessionsModal.classList.add('open');

@@ -11,6 +11,7 @@ import {
 import type { StoredMessage } from "../lib/types";
 import { backgroundProcesses, trySend } from "../lib/claude";
 import { discoverSprites, getSpriteStatus, getNetworkInfo, getHostname, updateHeartbeat, deleteSprite } from "../lib/network";
+import * as distributedTasks from "./distributed-tasks";
 
 // Claude projects directory
 const CLAUDE_PROJECTS_DIR = join(process.env.HOME || "/home/sprite", ".claude", "projects");
@@ -491,6 +492,113 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     } catch {
       return new Response("Not found", { status: 404 });
     }
+  }
+
+  // Distributed Tasks API
+
+  // POST /api/distributed-tasks - Create a task
+  if (req.method === "POST" && path === "/api/distributed-tasks") {
+    return (async () => {
+      const body = await req.json();
+      const result = await distributedTasks.createTask({ body, params: {}, method: "POST" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 400 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // POST /api/distributed-tasks/distribute - Distribute tasks to available sprites
+  if (req.method === "POST" && path === "/api/distributed-tasks/distribute") {
+    return (async () => {
+      const body = await req.json();
+      const result = await distributedTasks.distributeTasks({ body, params: {}, method: "POST" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 400 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // POST /api/distributed-tasks/check - Check for new tasks
+  if (req.method === "POST" && path === "/api/distributed-tasks/check") {
+    return (async () => {
+      const result = await distributedTasks.checkForTasks({ body: {}, params: {}, method: "POST" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 503 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // POST /api/distributed-tasks/complete - Complete current task
+  if (req.method === "POST" && path === "/api/distributed-tasks/complete") {
+    return (async () => {
+      const body = await req.json();
+      const result = await distributedTasks.completeTask({ body, params: {}, method: "POST" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 400 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // GET /api/distributed-tasks - List all tasks
+  if (req.method === "GET" && path === "/api/distributed-tasks") {
+    return (async () => {
+      const result = await distributedTasks.listTasks({ body: {}, params: {}, method: "GET" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 503 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // GET /api/distributed-tasks/mine - Get my tasks
+  if (req.method === "GET" && path === "/api/distributed-tasks/mine") {
+    return (async () => {
+      const result = await distributedTasks.getMyTasks({ body: {}, params: {}, method: "GET" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 503 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // GET /api/distributed-tasks/status - Get all sprites status
+  if (req.method === "GET" && path === "/api/distributed-tasks/status") {
+    return (async () => {
+      const result = await distributedTasks.getStatus({ body: {}, params: {}, method: "GET" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 503 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // GET /api/distributed-tasks/:id - Get a specific task
+  if (req.method === "GET" && path.match(/^\/api\/distributed-tasks\/[^/]+$/)) {
+    const id = path.split("/")[3];
+    return (async () => {
+      const result = await distributedTasks.getTask({ body: {}, params: { id }, method: "GET" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 404 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // PATCH /api/distributed-tasks/:id - Update a task
+  if (req.method === "PATCH" && path.match(/^\/api\/distributed-tasks\/[^/]+$/)) {
+    const id = path.split("/")[3];
+    return (async () => {
+      const body = await req.json();
+      const result = await distributedTasks.updateTaskStatus({ body, params: { id }, method: "PATCH" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 400 });
+      }
+      return Response.json(result);
+    })();
   }
 
   return null;

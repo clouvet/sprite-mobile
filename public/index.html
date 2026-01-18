@@ -69,6 +69,7 @@
           </svg>
         </button>
         <div id="status">Disconnected</div>
+        <button id="tasks-btn" title="Distributed Tasks">📋</button>
         <button id="settings-btn" title="Manage Sprites">⚙</button>
       </header>
 
@@ -126,6 +127,31 @@
         <p class="modal-description">Connect to a Claude session started in the terminal</p>
         <div id="external-sessions-list" class="external-sessions-list">
           <div class="loading">Loading sessions...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tasks Modal -->
+  <div id="tasks-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Distributed Tasks</h2>
+        <button class="modal-close" id="close-tasks-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="tasks-section">
+          <h3>My Tasks</h3>
+          <div id="my-tasks-list" class="tasks-list"></div>
+        </div>
+        <div class="tasks-section">
+          <h3>All Sprites Status</h3>
+          <button id="refresh-tasks-btn" class="refresh-btn" title="Refresh">&#8635;</button>
+          <div id="all-tasks-status" class="tasks-list"></div>
+        </div>
+        <div class="tasks-section">
+          <h3>All Tasks</h3>
+          <div id="all-tasks-list" class="tasks-list"></div>
         </div>
       </div>
     </div>
