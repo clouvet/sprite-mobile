@@ -1408,7 +1408,7 @@ const html = \`<!DOCTYPE html>
         // Transform emoji based on pull distance (max at 150px)
         const translateY = Math.min(pullDistance * 0.5, 75);
         if (emojiElement) {
-          emojiElement.style.transform = \`translateY(\${translateY}px)\`;
+          emojiElement.style.transform = 'translateY(' + translateY + 'px)';
         }
       }
     }, { passive: true });
