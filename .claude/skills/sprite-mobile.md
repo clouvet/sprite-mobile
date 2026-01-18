@@ -104,6 +104,155 @@ On each service start, sprite-mobile:
 
 This means all sprites auto-update when they wake up.
 
+## Scripts Reference
+
+All helper scripts are located in `~/.sprite-mobile/scripts/`. These scripts automate common sprite-mobile management tasks.
+
+### update-all-sprites.sh
+
+**Purpose**: Update and restart sprite-mobile on all other sprite-mobile sprites in your network
+
+**Usage**:
+```bash
+cd ~/.sprite-mobile
+./scripts/update-all-sprites.sh
+```
+
+**What it does**:
+1. Gets list of all sprites from `sprite list`
+2. For each sprite (excluding current):
+   - Pulls latest code from git (with GitHub auth)
+   - Restarts sprite-mobile service (re-registers if needed via step 8)
+   - Regenerates and restarts tailnet-gate service (via step 10)
+3. Shows summary of successes and failures
+
+**When to use**:
+- After pushing updates to sprite-mobile
+- When you want to ensure all sprites are on the latest version
+- After making configuration changes that affect all sprites
+
+**Example output**:
+```
+[hanoi-winter] Updating sprite-mobile...
+  ✓ Code pulled
+  ✓ Service restarted
+  ✓ Tailnet-gate updated
+  ✓ Complete
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Update complete!
+  Success: 5
+  Failed: 0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Claude usage**: When user says "update and restart the other sprite-mobile sprites", run this script.
+
+### restart-others.sh
+
+**Purpose**: Restart sprite-mobile service on all other sprites (lighter version of update-all-sprites.sh)
+
+**Usage**:
+```bash
+cd ~/.sprite-mobile
+./scripts/restart-others.sh
+```
+
+**What it does**:
+- Sends SIGTERM to sprite-mobile service on each sprite
+- Services auto-restart and pull latest code (via start-service.sh auto-update)
+
+**When to use**:
+- Quick restart when you know code is already pulled
+- When you only need services to restart (not regenerate tailnet-gate)
+
+### create-sprite.sh
+
+**Purpose**: Create a new sprite-mobile sprite from an existing one
+
+**Usage**:
+```bash
+~/.sprite-mobile/scripts/create-sprite.sh <sprite-name>
+```
+
+**What it does**:
+1. Creates new sprite with given name
+2. Makes its URL public
+3. Transfers `~/.sprite-config` (excluding sprite-specific URLs)
+4. Downloads and runs setup script non-interactively
+5. Verifies all services are running
+
+**When to use**:
+- Creating a new sprite-mobile sprite
+- Replicating your sprite-mobile setup to a new sprite
+
+**Example**:
+```bash
+./scripts/create-sprite.sh my-new-sprite
+```
+
+See "Creating New Sprites" section for detailed documentation.
+
+### sprite-setup.sh
+
+**Purpose**: Main setup script for sprite-mobile installation and configuration
+
+**Usage**:
+```bash
+# Run all steps interactively
+./scripts/sprite-setup.sh
+
+# Run all steps non-interactively (with config)
+./scripts/sprite-setup.sh --config config.json --name my-sprite all
+
+# Run specific steps only
+./scripts/sprite-setup.sh 8        # Re-register sprite-mobile service
+./scripts/sprite-setup.sh 10       # Regenerate tailnet-gate
+./scripts/sprite-setup.sh 1-4 8 11 # Multiple steps
+
+# Export current config
+./scripts/sprite-setup.sh --export
+```
+
+**Steps**:
+1. Install Sprites CLI and authenticate
+2. Configure hostname, git user, URLs, and repo
+3. Authenticate Claude CLI
+4. Authenticate GitHub CLI
+5. Install Fly.io CLI
+6. Install and configure Tailscale
+7. Set up Tailscale Serve (HTTPS)
+8. Clone and run sprite-mobile (or re-register service)
+9. Set up Sprite Network credentials
+10. Start Tailnet Gate
+11. Create CLAUDE.md
+
+**When to use**:
+- Initial sprite-mobile installation
+- Re-registering services (step 8 after script path changes)
+- Regenerating tailnet-gate (step 10)
+- Fixing broken configuration
+
+### start-service.sh
+
+**Purpose**: Service wrapper that starts sprite-mobile with proper environment
+
+**Usage**: Called automatically by sprite-env, not meant to be run directly
+
+**What it does**:
+- Sources `~/.sprite-config` for environment variables
+- Runs `git pull` to auto-update code
+- Installs dependencies via `bun install`
+- Starts server with `bun run server.ts`
+
+**Service registration** (in sprite-env):
+```json
+{
+  "name": "sprite-mobile",
+  "cmd": "/home/sprite/.sprite-mobile/scripts/start-service.sh"
+}
+```
+
 ## Development Workflows
 
 ### Making Changes to sprite-mobile
@@ -145,9 +294,14 @@ When modifying the sprite-mobile app code:
 6. **Update other sprites** (if you have a sprite network):
    ```bash
    cd ~/.sprite-mobile
+   ./scripts/update-all-sprites.sh
+   ```
+   This script updates all other sprite-mobile sprites (pulls code, restarts services, regenerates tailnet-gate).
+
+   For a quicker restart (without regenerating tailnet-gate):
+   ```bash
    ./scripts/restart-others.sh
    ```
-   This script restarts sprite-mobile on all other network sprites, pulling your updates.
 
 ### Why Service Worker Cache Versioning Matters
 
