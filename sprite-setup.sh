@@ -1321,6 +1321,16 @@ const html = \`<!DOCTYPE html>
     h1 {
       font-size: 1.5rem;
     }
+    .pull-indicator {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #888;
+      transition: transform 0.2s ease-out;
+    }
+    .pull-indicator.pulling {
+      transform: scale(1.2);
+      color: #0f0;
+    }
   </style>
 </head>
 <body>
@@ -1328,6 +1338,7 @@ const html = \`<!DOCTYPE html>
   <div id="unauthorized">
     <div class="emoji">👾 🚫</div>
     <h1>Unauthorized</h1>
+    <div class="pull-indicator">Pull down to refresh</div>
   </div>
   <script>
     // Set iframe src with hash from current URL
@@ -1346,7 +1357,7 @@ const html = \`<!DOCTYPE html>
         iframe.style.display = 'none';
         unauthorized.classList.add('visible');
       }
-    }, 4000); // 4 second timeout
+    }, 8000); // 8 second timeout
 
     // Update iframe when outer hash changes
     window.addEventListener('hashchange', () => {
@@ -1389,6 +1400,37 @@ const html = \`<!DOCTYPE html>
     }
 
     connectKeepalive();
+
+    // Pull-to-refresh on unauthorized page
+    let touchStartY = 0;
+    let touchEndY = 0;
+    const pullIndicator = document.querySelector('.pull-indicator');
+
+    unauthorized.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    unauthorized.addEventListener('touchmove', (e) => {
+      touchEndY = e.touches[0].clientY;
+      const pullDistance = touchEndY - touchStartY;
+
+      if (pullDistance > 50 && pullIndicator) {
+        pullIndicator.classList.add('pulling');
+      }
+    }, { passive: true });
+
+    unauthorized.addEventListener('touchend', () => {
+      const pullDistance = touchEndY - touchStartY;
+
+      if (pullDistance > 100) {
+        window.location.reload();
+      } else if (pullIndicator) {
+        pullIndicator.classList.remove('pulling');
+      }
+
+      touchStartY = 0;
+      touchEndY = 0;
+    }, { passive: true });
   </script>
 </body>
 </html>\`;
