@@ -111,8 +111,8 @@ The distributed tasks feature enables:
 Simply tell Claude to assign work to another sprite:
 
 ```
-"Assign hanoi-winter to implement feature X"
-"Assign sad-clown to fix the bug in module Y"
+"Assign carnivorous-slobbius to implement feature X"
+"Assign eternalii-famishus to fix the bug in module Y"
 ```
 
 Claude will create the task and automatically wake the target sprite. The target sprite will:
@@ -204,12 +204,12 @@ Tasks are stored in your shared Tigris bucket with the following structure:
 
 Here's a complete example of distributed tasks in action:
 
-1. **User on sprite `sad-clown`**: "Assign hanoi-winter to implement features A, B, and C"
-2. **sad-clown's Claude**: Creates 3 tasks in Tigris and wakes hanoi-winter with `sprite exec`
-3. **hanoi-winter**: Receives tasks, creates a new Claude Code session for task A
-4. **hanoi-winter**: Completes task A, reports back to Tigris, automatically starts task B
-5. **User on sprite `eternus-failurus`**: "What are other sprites working on?"
-6. **eternus-failurus's Claude**: Queries task status and responds: "hanoi-winter is working on 'Implement feature B' with 1 task queued"
+1. **User on sprite `eternalii-famishus`**: "Assign carnivorous-slobbius to implement features A, B, and C"
+2. **eternalii-famishus's Claude**: Creates 3 tasks in Tigris and wakes carnivorous-slobbius with `sprite exec`
+3. **carnivorous-slobbius**: Receives tasks, creates a new Claude Code session for task A
+4. **carnivorous-slobbius**: Completes task A, reports back to Tigris, automatically starts task B
+5. **User on sprite `canis-latrans`**: "What are other sprites working on?"
+6. **canis-latrans's Claude**: Queries task status and responds: "carnivorous-slobbius is working on 'Implement feature B' with 1 task queued"
 
 ### Prerequisites
 
@@ -225,7 +225,7 @@ The sprite network is automatically configured during initial setup if you provi
 Sprite Mobile uses Tailscale for secure access without passwords or tokens:
 
 ```
-Public URL (https://sprite.fly.dev)
+Public URL (https://sprite.sprites.app)
          │
          ▼
    Tailnet Gate (port 8080)
@@ -244,7 +244,7 @@ Public URL (https://sprite.fly.dev)
 
 | Path | URL | Auth | HTTPS | PWA |
 |------|-----|------|-------|-----|
-| Public | `https://sprite.fly.dev` | Tailnet Gate | Yes | Via iframe |
+| Public | `https://sprite.sprites.app` | Tailnet Gate | Yes | Via iframe |
 | Tailscale Serve | `https://my-sprite.ts.net` | Tailnet only | Yes | Yes |
 | Tailscale IP | `http://100.x.x.x:8081` | Tailnet only | No | No |
 
@@ -328,7 +328,7 @@ Step 1: Creating sprite...
   Created sprite: my-new-sprite
 
 Step 2: Making URL public...
-  Public URL: https://my-new-sprite.fly.dev
+  Public URL: https://my-new-sprite.sprites.app
 
 Step 3: Transferring configuration...
   Transferred ~/.sprite-config (excluded sprite-specific URLs)
@@ -371,7 +371,7 @@ The `create-sprite.sh` script uses a defense-in-depth approach:
 
 2. **Passes correct values** to setup script:
    ```bash
-   sprite exec -- ./sprite-setup.sh --name 'my-new-sprite' --url 'https://my-new-sprite.fly.dev' all
+   sprite exec -- ./sprite-setup.sh --name 'my-new-sprite' --url 'https://my-new-sprite.sprites.app' all
    ```
 
 This ensures the new sprite always gets the correct public URL and hostname, even if the source config contained different values.

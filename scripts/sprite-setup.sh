@@ -522,7 +522,7 @@ step_2_configuration() {
 
         # Method 2: Extract from SPRITE_PUBLIC_URL if available
         elif [ -n "$SPRITE_PUBLIC_URL" ]; then
-            # Extract hostname from URL (e.g., https://sad-clown.fly.dev -> sad-clown)
+            # Extract hostname from URL (e.g., https://eternalii-famishus.fly.dev -> eternalii-famishus)
             DETECTED_SPRITE_NAME=$(echo "$SPRITE_PUBLIC_URL" | sed -E 's|^https?://([^./]+).*|\1|')
             if [ -n "$DETECTED_SPRITE_NAME" ]; then
                 echo "Extracted sprite name from public URL: $DETECTED_SPRITE_NAME"
@@ -1573,7 +1573,7 @@ sprite-env services logs sprite-mobile  # View logs
 Public entry point that gates access via Tailscale. Located at `~/.tailnet-gate/`.
 
 **How it works:**
-1. User visits public URL (e.g., `https://sprite.fly.dev`)
+1. User visits public URL (e.g., `https://my-sprite.sprites.app`)
 2. Gate serves a page that attempts to reach the Tailscale URL
 3. If reachable (user on tailnet) → redirects to Tailscale HTTPS URL
 4. If unreachable → shows "Unauthorized" page
