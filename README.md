@@ -90,6 +90,8 @@ Claude will have full context about sprite-mobile without needing to read throug
 
 ## Distributed Tasks
 
+> **⚠️ Experimental Feature**: Distributed tasks is a new feature that has not been thoroughly tested. Use with caution and expect potential issues or behavior changes.
+
 sprite-mobile includes a distributed task management system that allows sprites in your network to assign work to each other, track progress, and automatically process queued tasks. This enables collaborative workflows across your sprite fleet.
 
 ### Overview
