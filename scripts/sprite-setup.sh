@@ -509,16 +509,28 @@ step_2_configuration() {
     # Ensure shell configs source ~/.sprite-config
     ensure_shell_config_sourcing
 
-    # Check and update hostname if it's "sprite"
+    # Get current hostname
     CURRENT_HOSTNAME=$(hostname)
+
+    # If SPRITE_PUBLIC_URL is set but SPRITE_NAME isn't, extract sprite name from URL
+    # This helps with hostname detection below
+    if [ -n "$SPRITE_PUBLIC_URL" ] && [ -z "$SPRITE_NAME" ]; then
+        # Extract sprite name from URL (e.g., https://empty-battery-bio2f.sprites.app -> empty-battery-bio2f)
+        SPRITE_NAME=$(echo "$SPRITE_PUBLIC_URL" | sed -E 's|^https?://([^./]+).*|\1|')
+        if [ -n "$SPRITE_NAME" ]; then
+            echo "Extracted sprite name from SPRITE_PUBLIC_URL: $SPRITE_NAME"
+        fi
+    fi
+
+    # Check and update hostname if it's "sprite"
     if [ "$CURRENT_HOSTNAME" = "sprite" ]; then
         # Try to determine the actual sprite name
         DETECTED_SPRITE_NAME=""
 
-        # Method 1: Use SPRITE_NAME if provided via --name
+        # Method 1: Use SPRITE_NAME if provided via --name or detected above
         if [ -n "$SPRITE_NAME" ]; then
             DETECTED_SPRITE_NAME="$SPRITE_NAME"
-            echo "Using sprite name from --name argument: $DETECTED_SPRITE_NAME"
+            echo "Using sprite name: $DETECTED_SPRITE_NAME"
 
         # Method 2: Extract from SPRITE_PUBLIC_URL if available
         elif [ -n "$SPRITE_PUBLIC_URL" ]; then
@@ -527,38 +539,74 @@ step_2_configuration() {
             if [ -n "$DETECTED_SPRITE_NAME" ]; then
                 echo "Extracted sprite name from public URL: $DETECTED_SPRITE_NAME"
             fi
-
-        # Method 3: Try to get from sprite whoami
-        else
-            WHOAMI_RESPONSE=$(sprite whoami 2>/dev/null || echo "")
-            if [ -n "$WHOAMI_RESPONSE" ]; then
-                # Try to extract sprite name from whoami output
-                DETECTED_SPRITE_NAME=$(echo "$WHOAMI_RESPONSE" | grep -o 'sprite:[[:space:]]*[^[:space:]]*' | sed 's/sprite:[[:space:]]*//' | head -1)
-                if [ -n "$DETECTED_SPRITE_NAME" ]; then
-                    echo "Detected sprite name from 'sprite whoami': $DETECTED_SPRITE_NAME"
-                fi
-            fi
         fi
 
         # Change hostname if we detected a sprite name
         if [ -n "$DETECTED_SPRITE_NAME" ]; then
             echo "Changing hostname from 'sprite' to '$DETECTED_SPRITE_NAME'..."
+
+            # Update /etc/hosts FIRST to avoid "unable to resolve host" errors
+            if [ -f /etc/hosts ]; then
+                # Remove any lines containing the old hostname (sprite) that aren't localhost
+                sudo sed -i "/^127\.0\.0\.1[[:space:]]*sprite$/d" /etc/hosts
+                sudo sed -i "/^127\.0\.1\.1[[:space:]]*sprite$/d" /etc/hosts
+                sudo sed -i "/^fdf::1[[:space:]]*sprite$/d" /etc/hosts
+
+                # Update or add 127.0.1.1 entry for new hostname
+                if grep -q "^127\.0\.1\.1" /etc/hosts; then
+                    # Replace existing 127.0.1.1 entry
+                    sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$DETECTED_SPRITE_NAME/" /etc/hosts
+                else
+                    # Add 127.0.1.1 entry after 127.0.0.1 localhost line
+                    sudo sed -i "/^127\.0\.0\.1.*localhost/a 127.0.1.1\t$DETECTED_SPRITE_NAME" /etc/hosts
+                fi
+
+                # Update IPv6 entry if it exists
+                if grep -q "^fdf::1[[:space:]]" /etc/hosts; then
+                    # Update first fdf::1 entry that's not localhost to use new hostname
+                    sudo sed -i "0,/^fdf::1[[:space:]]\+[^l]/ s/^fdf::1[[:space:]].*/fdf::1\t$DETECTED_SPRITE_NAME/" /etc/hosts
+                fi
+
+                echo "Updated /etc/hosts with hostname: $DETECTED_SPRITE_NAME"
+            fi
+
+            # Update /etc/hostname to persist across reboots
+            echo "$DETECTED_SPRITE_NAME" | sudo tee /etc/hostname > /dev/null
+            echo "Updated /etc/hostname for persistence"
+
+            # Now change the hostname (this is last so /etc/hosts is already updated)
             if sudo hostname "$DETECTED_SPRITE_NAME" 2>/dev/null; then
                 echo "Hostname changed to: $DETECTED_SPRITE_NAME"
                 CURRENT_HOSTNAME="$DETECTED_SPRITE_NAME"
-
-                # Update /etc/hostname to persist across reboots
-                echo "$DETECTED_SPRITE_NAME" | sudo tee /etc/hostname > /dev/null
-                echo "Updated /etc/hostname for persistence"
             else
                 echo "Warning: Could not change hostname (may require permissions)"
             fi
         else
             echo "Could not determine sprite name, keeping hostname as 'sprite'"
         fi
+    else
+        # Hostname is not "sprite", but ensure /etc/hosts is clean
+        # This handles cases where hostname was already changed but /etc/hosts has old entries
+        if [ -f /etc/hosts ]; then
+            # Remove old "sprite" entries
+            sudo sed -i "/^127\.0\.0\.1[[:space:]]*sprite$/d" /etc/hosts
+            sudo sed -i "/^127\.0\.1\.1[[:space:]]*sprite$/d" /etc/hosts
+            sudo sed -i "/^fdf::1[[:space:]]*sprite$/d" /etc/hosts
+
+            # Ensure current hostname is in /etc/hosts
+            if ! grep -q "^127\.0\.1\.1[[:space:]]*$CURRENT_HOSTNAME" /etc/hosts; then
+                # Update or add 127.0.1.1 entry
+                if grep -q "^127\.0\.1\.1" /etc/hosts; then
+                    sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$CURRENT_HOSTNAME/" /etc/hosts
+                else
+                    sudo sed -i "/^127\.0\.0\.1.*localhost/a 127.0.1.1\t$CURRENT_HOSTNAME" /etc/hosts
+                fi
+                echo "Cleaned up /etc/hosts for hostname: $CURRENT_HOSTNAME"
+            fi
+        fi
     fi
 
-    # Auto-detect sprite public URL if not already set
+    # Auto-detect sprite public URL if not already set (for non-sprite hostnames)
     URL_AUTO_DETECTED=false
     if [ -z "$SPRITE_PUBLIC_URL" ]; then
         # Try to get public URL from sprite API using current hostname
@@ -601,8 +649,11 @@ step_2_configuration() {
             SPRITE_PUBLIC_URL="${input_url:-$SPRITE_PUBLIC_URL}"
         fi
 
-        read -p "sprite-mobile GitHub repo [$SPRITE_MOBILE_REPO]: " input_repo
-        SPRITE_MOBILE_REPO="${input_repo:-$SPRITE_MOBILE_REPO}"
+        # Only prompt for repo if it's not already set
+        if [ -z "$SPRITE_MOBILE_REPO" ]; then
+            read -p "sprite-mobile GitHub repo [https://github.com/clouvet/sprite-mobile]: " input_repo
+            SPRITE_MOBILE_REPO="${input_repo:-https://github.com/clouvet/sprite-mobile}"
+        fi
     fi
 
     # Save to ~/.sprite-config

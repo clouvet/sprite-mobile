@@ -1,7 +1,7 @@
 // Service Worker for Sprite Code PWA
 // Caches shell for offline-first loading and stores public URL for sprite wake-up
 
-const CACHE_VERSION = 'v27';
+const CACHE_VERSION = 'v28';
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const CONFIG_CACHE = `config-${CACHE_VERSION}`;
 

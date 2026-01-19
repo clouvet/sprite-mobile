@@ -172,6 +172,7 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
   if (req.method === "GET" && path === "/api/config") {
     return Response.json({
       publicUrl: process.env.SPRITE_PUBLIC_URL || "",
+      spriteName: getHostname(),
     });
   }
 

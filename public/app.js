@@ -290,7 +290,7 @@
 
       if (cachedConfig?.publicUrl) {
         spritePublicUrl = cachedConfig.publicUrl;
-        updateSpriteName(getSpriteNameFromUrl(spritePublicUrl));
+        updateSpriteName(cachedConfig.spriteName || getSpriteNameFromUrl(spritePublicUrl));
         wakeLog('Pinging: ' + spritePublicUrl);
 
         // Ping the public URL to wake the sprite
@@ -307,7 +307,7 @@
         if (config) {
           wakeLog('Sprite responded!');
           spritePublicUrl = config.publicUrl;
-          updateSpriteName(getSpriteNameFromUrl(spritePublicUrl));
+          updateSpriteName(config.spriteName || getSpriteNameFromUrl(spritePublicUrl));
           cacheConfig(config);
           startPublicKeepalive();
           return true;
@@ -323,7 +323,7 @@
         if (config?.publicUrl) {
           wakeLog('Direct connection OK');
           spritePublicUrl = config.publicUrl;
-          updateSpriteName(getSpriteNameFromUrl(spritePublicUrl));
+          updateSpriteName(config.spriteName || getSpriteNameFromUrl(spritePublicUrl));
           cacheConfig(config);
           startPublicKeepalive();
           return true;
