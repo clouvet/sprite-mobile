@@ -255,7 +255,7 @@ Public URL (https://sprite.sprites.app)
 To set up a fresh Sprite with all dependencies, authentication, and services, download and run the setup script:
 
 ```bash
-curl -fsSL https://gist.githubusercontent.com/clouvet/901dabc09e62648fa394af65ad004d04/raw/sprite-setup.sh -o sprite-setup.sh && chmod +x sprite-setup.sh && ./sprite-setup.sh
+curl -fsSL https://raw.githubusercontent.com/clouvet/sprite-mobile/refs/heads/main/scripts/sprite-setup.sh -o sprite-setup.sh && chmod +x sprite-setup.sh && ./sprite-setup.sh
 ```
 
 The script will:
