@@ -13,6 +13,7 @@ sprite-mobile gives you a progressive web app chat UI for accessing Claude Code 
 - [Prerequisites](#prerequisites)
 - [Claude Code Integration](#claude-code-integration)
 - [Features](#features)
+- [Distributed Tasks](#distributed-tasks)
 - [Access Model](#access-model)
 - [Sprite Setup](#sprite-setup)
 - [Sprite Orchestration](#sprite-orchestration)
@@ -83,8 +84,139 @@ Claude will have full context about sprite-mobile without needing to read throug
 - **PWA Support**: Installable as a Progressive Web App, works offline (requires HTTPS via Tailscale Serve)
 - **Auto-update**: Pulls latest code when the service starts
 - **Sprite Network**: Automatic discovery of other sprites in your Fly.io organization via shared Tigris bucket
+- **Distributed Tasks**: Assign work across sprites, track progress, and automatically process task queues
 - **Hot Reloading**: Server code changes take effect immediately without restart
 - **Network Restart**: Run `scripts/restart-others.sh` to restart sprite-mobile on all other network sprites after pulling updates
+
+## Distributed Tasks
+
+sprite-mobile includes a distributed task management system that allows sprites in your network to assign work to each other, track progress, and automatically process queued tasks. This enables collaborative workflows across your sprite fleet.
+
+### Overview
+
+The distributed tasks feature enables:
+- **Task assignment from chat**: Ask Claude to assign tasks to specific sprites
+- **Round-robin distribution**: Distribute multiple tasks across available sprites automatically
+- **Automatic sprite wake-up**: Target sprites are automatically awakened using `sprite exec`
+- **Sequential processing**: Each sprite processes tasks one at a time from its queue
+- **Auto-sessions**: Tasks automatically create Claude Code sessions with the task description
+- **Progress tracking**: Monitor what each sprite is working on across your network
+
+### Usage
+
+#### Assigning Tasks from Chat
+
+Simply tell Claude to assign work to another sprite:
+
+```
+"Assign hanoi-winter to implement feature X"
+"Assign sad-clown to fix the bug in module Y"
+```
+
+Claude will create the task and automatically wake the target sprite. The target sprite will:
+1. Receive the task in its queue
+2. Create a new Claude Code session with the task description
+3. Work on the task autonomously
+4. Report completion back to Tigris
+5. Automatically pick up the next queued task
+
+#### Distributing Multiple Tasks
+
+For bulk work, use round-robin distribution:
+
+```
+"Distribute these 4 tasks across available sprites"
+```
+
+This automatically spreads the workload evenly across sprites in your network.
+
+#### Monitoring Task Status
+
+Check on your sprite network's progress:
+
+```
+"What are other sprites working on?"
+```
+
+Claude will query the distributed task status and show:
+- Current tasks in progress
+- Queued tasks per sprite
+- Recent completions
+
+#### Using the Tasks UI
+
+The web interface includes a Tasks button (📋) in the header that opens a modal showing:
+- **My Tasks**: Your current task and queue
+- **All Sprites Status**: What each sprite in the network is working on
+- **Task History**: Complete task history with status-based color coding
+
+### API Endpoints
+
+The distributed tasks system provides these API endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/distributed-tasks` | Create a new task |
+| POST | `/api/distributed-tasks/distribute` | Distribute tasks round-robin |
+| POST | `/api/distributed-tasks/check` | Check for new tasks in queue |
+| POST | `/api/distributed-tasks/complete` | Mark a task complete |
+| GET | `/api/distributed-tasks` | List all tasks |
+| GET | `/api/distributed-tasks/mine` | Get tasks for this sprite |
+| GET | `/api/distributed-tasks/status` | Get status of all sprites |
+
+### Data Model
+
+Tasks are stored in your shared Tigris bucket with the following structure:
+
+**Task Object** (`tasks/{task-id}.json`):
+```json
+{
+  "id": "uuid",
+  "assignedTo": "sprite-name",
+  "assignedBy": "sprite-name",
+  "status": "pending|in_progress|completed|failed",
+  "title": "Task title",
+  "description": "Full task description",
+  "createdAt": "ISO date",
+  "startedAt": "ISO date",
+  "completedAt": "ISO date",
+  "sessionId": "session-id",
+  "result": {
+    "summary": "What was accomplished",
+    "success": true
+  }
+}
+```
+
+**Task Queue** (`task-queues/{sprite-name}.json`):
+```json
+{
+  "spriteName": "sprite-name",
+  "queuedTasks": ["task-id-1", "task-id-2"],
+  "currentTask": "task-id-3",
+  "lastUpdated": "ISO date"
+}
+```
+
+### Example Workflow
+
+Here's a complete example of distributed tasks in action:
+
+1. **User on sprite `sad-clown`**: "Assign hanoi-winter to implement features A, B, and C"
+2. **sad-clown's Claude**: Creates 3 tasks in Tigris and wakes hanoi-winter with `sprite exec`
+3. **hanoi-winter**: Receives tasks, creates a new Claude Code session for task A
+4. **hanoi-winter**: Completes task A, reports back to Tigris, automatically starts task B
+5. **User on sprite `eternus-failurus`**: "What are other sprites working on?"
+6. **eternus-failurus's Claude**: Queries task status and responds: "hanoi-winter is working on 'Implement feature B' with 1 task queued"
+
+### Prerequisites
+
+Distributed tasks requires:
+- **Sprite Network configuration**: Shared Tigris bucket credentials
+- **sprite-exec access**: Ability to execute commands on target sprites
+- **Multiple sprites**: At least 2 sprites in your network for cross-sprite assignment
+
+The sprite network is automatically configured during initial setup if you provide Tigris credentials.
 
 ## Access Model
 
@@ -367,6 +499,13 @@ All data is stored in the `data/` directory:
 | GET | `/api/network/sprites` | Discover sprites in the network |
 | POST | `/api/network/heartbeat` | Manual heartbeat trigger |
 | DELETE | `/api/network/sprites/:hostname` | Remove a sprite from the network |
+| POST | `/api/distributed-tasks` | Create a new task |
+| POST | `/api/distributed-tasks/distribute` | Distribute tasks round-robin |
+| POST | `/api/distributed-tasks/check` | Check for new tasks |
+| POST | `/api/distributed-tasks/complete` | Mark task complete |
+| GET | `/api/distributed-tasks` | List all tasks |
+| GET | `/api/distributed-tasks/mine` | Get this sprite's tasks |
+| GET | `/api/distributed-tasks/status` | Get all sprites status |
 
 ### WebSocket
 
