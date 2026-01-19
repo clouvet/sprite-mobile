@@ -405,6 +405,160 @@ Connect to `/ws?session={sessionId}` for real-time chat.
 }
 ```
 
+## Distributed Tasks
+
+sprite-mobile supports distributing tasks across multiple sprites in your network. This allows one sprite to assign work to other sprites and track progress.
+
+### Core Concepts
+
+**Tasks**: Work items that can be assigned to sprites
+- Each task has: title, description, assigned sprite, status, and result
+- Status: `pending` → `in_progress` → `completed`/`failed`
+- Tasks are queued per sprite and executed sequentially
+- Task data stored in Tigris bucket (`tasks/` and `task-queues/` prefixes)
+
+**Task Queue**: Each sprite has its own queue
+- Tasks are processed one at a time
+- When a task completes, the sprite automatically checks for the next one
+- Tasks create new Claude Code sessions with the task description
+
+### Assigning Tasks
+
+**From Chat (recommended):**
+
+User talks to Claude on one sprite and asks it to assign tasks:
+
+```
+"Assign hanoi-winter to implement feature X"
+"Distribute these 4 tasks across available sprites"
+```
+
+Claude will:
+1. Create task(s) in Tigris
+2. Wake target sprites using `sprite exec`
+3. Target sprites auto-create sessions and start work
+
+**Via API:**
+
+```bash
+# Assign specific task
+curl -X POST http://localhost:8081/api/distributed-tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "assignedTo": "hanoi-winter",
+    "title": "Implement feature X",
+    "description": "Detailed task description..."
+  }'
+
+# Distribute tasks round-robin
+curl -X POST http://localhost:8081/api/distributed-tasks/distribute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "taskDescriptions": [
+      {"title": "Task 1", "description": "..."},
+      {"title": "Task 2", "description": "..."}
+    ]
+  }'
+```
+
+### Completing Tasks
+
+When Claude finishes a task, it should call:
+
+```bash
+curl -X POST http://localhost:8081/api/distributed-tasks/complete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "Completed feature X by implementing Y and Z",
+    "success": true
+  }'
+```
+
+The sprite will automatically check for the next queued task.
+
+### Querying Status
+
+**My tasks:**
+```bash
+curl http://localhost:8081/api/distributed-tasks/mine
+```
+
+**All sprites status:**
+```bash
+curl http://localhost:8081/api/distributed-tasks/status
+```
+
+**All tasks:**
+```bash
+curl http://localhost:8081/api/distributed-tasks
+```
+
+**In chat:**
+```
+"What are the other sprites working on?"
+"Show me the status of all tasks"
+```
+
+Claude will query the API and summarize the results.
+
+### UI
+
+The tasks modal (📋 button in header) shows:
+- **My Tasks**: Current and queued tasks for this sprite
+- **All Sprites Status**: What each sprite is working on
+- **All Tasks**: Complete task history
+
+### Task Flow Example
+
+1. **sad-clown assigns tasks to hanoi-winter:**
+   ```
+   User: "Assign hanoi-winter to implement features A, B, and C"
+   ```
+
+2. **sad-clown's Claude:**
+   - Creates 3 tasks in Tigris
+   - Wakes hanoi-winter with `sprite exec`
+
+3. **hanoi-winter receives tasks:**
+   - API endpoint `/api/distributed-tasks/check` is called
+   - Gets first task from queue
+   - Creates Claude session with task description
+   - Marks task as `in_progress`
+
+4. **hanoi-winter works:**
+   - Claude completes the task
+   - Calls `/api/distributed-tasks/complete` with summary
+   - Automatically picks up next task (B)
+
+5. **Querying from eternus-failurus:**
+   ```
+   User: "What are the other sprites working on?"
+   Claude: "sad-clown is idle. hanoi-winter is working on 'Implement feature B' and has 1 task queued."
+   ```
+
+### API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/distributed-tasks` | Create a task |
+| POST | `/api/distributed-tasks/distribute` | Distribute tasks to sprites |
+| POST | `/api/distributed-tasks/check` | Check for new tasks (called by sprite exec) |
+| POST | `/api/distributed-tasks/complete` | Mark current task complete |
+| GET | `/api/distributed-tasks` | List all tasks |
+| GET | `/api/distributed-tasks/mine` | Get my tasks (current + queued) |
+| GET | `/api/distributed-tasks/status` | Get all sprites status |
+| GET | `/api/distributed-tasks/:id` | Get specific task |
+| PATCH | `/api/distributed-tasks/:id` | Update task |
+
+### Important Notes
+
+- Tasks require sprite network to be configured (same Tigris bucket)
+- Sprites check for sprite existence using `sprite list` API
+- Tasks for destroyed sprites remain in `pending` state
+- Claude should ask user before assigning tasks (don't auto-assign without confirmation)
+- Task sessions are created with task description as initial message
+- Sprites automatically process queued tasks after completing current task
+
 ## Quick Reference
 
 **Project location**: `~/.sprite-mobile/`
