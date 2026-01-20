@@ -736,7 +736,7 @@
           // Claude finished responding - clean up and focus input on desktop
           removeToolIndicator();
           finalizeAssistantMessage();
-          hideStopButton();
+          disableStopButton();
           if (isDesktop()) {
             inputEl.focus();
           }
@@ -808,7 +808,7 @@
 
     function finalizeAssistantMessage() {
       removeToolIndicator();
-      hideStopButton();
+      disableStopButton();
       if (currentAssistantMessage) {
         const contentEl = currentAssistantMessage.querySelector('.message-content');
         contentEl.classList.remove('streaming');
@@ -863,7 +863,7 @@
     function showActivityIndicator(action, detail = null) {
       removeActivityIndicator();
       removeThinkingIndicator();
-      showStopButton();
+      enableStopButton();
       const indicator = document.createElement('div');
       indicator.className = 'activity-indicator';
       indicator.innerHTML = `
@@ -935,7 +935,7 @@
       `;
       messagesEl.appendChild(indicator);
       scrollToBottom();
-      showStopButton();
+      enableStopButton();
     }
 
     function removeThinkingIndicator() {
@@ -1000,8 +1000,8 @@
       const payload = { type: 'interrupt' };
       ws.send(JSON.stringify(payload));
 
-      // Hide stop button and clean up indicators
-      stopBtn.classList.remove('visible');
+      // Disable stop button and clean up indicators
+      disableStopButton();
       removeThinkingIndicator();
       removeActivityIndicator();
       removeToolIndicator();
@@ -1010,15 +1010,15 @@
       addSystemMessage('Interrupted by user');
     }
 
-    function showStopButton() {
+    function enableStopButton() {
       if (stopBtn) {
-        stopBtn.classList.add('visible');
+        stopBtn.disabled = false;
       }
     }
 
-    function hideStopButton() {
+    function disableStopButton() {
       if (stopBtn) {
-        stopBtn.classList.remove('visible');
+        stopBtn.disabled = true;
       }
     }
 

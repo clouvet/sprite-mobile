@@ -303,32 +303,32 @@
     }
 
     #stop-btn {
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       border-radius: 8px;
       background: transparent;
-      border: 1px solid #ef4444;
+      border: none;
       color: #ef4444;
-      font-size: 14px;
       cursor: pointer;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      margin-right: 4px;
       transition: all 0.15s;
+      opacity: 1;
     }
 
-    #stop-btn.visible {
-      display: flex !important;
+    #stop-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
     }
 
-    #stop-btn:active {
+    #stop-btn:not(:disabled):active {
       background: rgba(239, 68, 68, 0.2);
       transform: scale(0.95);
     }
 
-    #stop-btn:hover {
+    #stop-btn:not(:disabled):hover {
       background: rgba(239, 68, 68, 0.1);
     }
 
