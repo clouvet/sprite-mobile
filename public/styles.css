@@ -320,7 +320,7 @@
     }
 
     #stop-btn.visible {
-      display: flex;
+      display: flex !important;
     }
 
     #stop-btn:active {
