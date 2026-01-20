@@ -113,6 +113,9 @@ export const websocketHandlers = {
           // Start handling output
           handleClaudeOutput(bg);
           handleClaudeStderr(bg);
+
+          // Small delay to let the process initialize
+          await new Promise(resolve => setTimeout(resolve, 100));
         } else {
           ws.send(JSON.stringify({ type: "error", message: "No active Claude process" }));
           return;
