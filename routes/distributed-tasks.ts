@@ -45,10 +45,10 @@ export async function createTask(req: Request): Promise<any> {
     sessionId,
   });
 
-  // Use wakeAndNotifySprite to trigger the target sprite to check for tasks
-  // The checkForTasks endpoint will spawn Claude properly through sprite-mobile
-  wakeAndNotifySprite(assignedTo).catch(err => {
-    console.error(`Failed to wake ${assignedTo}:`, err);
+  // Start Claude on the target sprite using sprite exec with --resume
+  // This creates a detachable session that keeps the sprite alive
+  wakeAndStartTaskOnSprite(assignedTo, sessionId).catch(err => {
+    console.error(`Failed to start task on ${assignedTo}:`, err);
   });
 
   return { task };
@@ -109,22 +109,19 @@ function summarizeDistribution(tasks: tasks.DistributedTask[]): Record<string, n
   return distribution;
 }
 
-async function wakeAndStartTaskOnSprite(spriteName: string, sessionId: string, taskPrompt: string): Promise<void> {
+async function wakeAndStartTaskOnSprite(spriteName: string, sessionId: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    // Use sprite exec to run Claude with the prompt piped via heredoc
+    // Use sprite exec to run Claude with --resume to use the session we already created
     // This avoids shell escaping issues and creates a detachable session
     console.log(`Starting Claude on ${spriteName} for session ${sessionId}`);
-
-    // Use heredoc to safely pass the prompt to claude
-    const bashCommand = `claude <<'TASK_PROMPT_EOF'\n${taskPrompt}\nTASK_PROMPT_EOF`;
 
     const proc = spawn("sprite", [
       "exec",
       "-s",
       spriteName,
-      "bash",
-      "-c",
-      bashCommand
+      "claude",
+      "--resume",
+      sessionId
     ]);
 
     let output = "";
