@@ -93,6 +93,18 @@ export const websocketHandlers = {
     try {
       const data = JSON.parse(message.toString());
 
+      if (data.type === "interrupt") {
+        // Send ESC character to Claude process to interrupt
+        try {
+          bg.process.stdin.write("\x1b"); // ESC character
+          bg.process.stdin.flush();
+          console.log(`Interrupt signal sent to session ${sessionId}`);
+        } catch (err) {
+          console.error("Error sending interrupt:", err);
+        }
+        return;
+      }
+
       if (data.type === "user" && (data.content || data.imageId)) {
         // Check if this is the first message - auto-rename the session
         const existingMessages = loadMessages(sessionId);

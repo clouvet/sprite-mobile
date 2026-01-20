@@ -54,6 +54,7 @@
     const statusEl = document.getElementById('status');
     const settingsBtn = document.getElementById('settings-btn');
     const regenerateTitleBtn = document.getElementById('regenerate-title-btn');
+    const stopBtn = document.getElementById('stop-btn');
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
     const imagePreview = document.getElementById('image-preview');
@@ -735,6 +736,7 @@
           // Claude finished responding - clean up and focus input on desktop
           removeToolIndicator();
           finalizeAssistantMessage();
+          hideStopButton();
           if (isDesktop()) {
             inputEl.focus();
           }
@@ -806,6 +808,7 @@
 
     function finalizeAssistantMessage() {
       removeToolIndicator();
+      hideStopButton();
       if (currentAssistantMessage) {
         const contentEl = currentAssistantMessage.querySelector('.message-content');
         contentEl.classList.remove('streaming');
@@ -860,6 +863,7 @@
     function showActivityIndicator(action, detail = null) {
       removeActivityIndicator();
       removeThinkingIndicator();
+      showStopButton();
       const indicator = document.createElement('div');
       indicator.className = 'activity-indicator';
       indicator.innerHTML = `
@@ -931,6 +935,7 @@
       `;
       messagesEl.appendChild(indicator);
       scrollToBottom();
+      showStopButton();
     }
 
     function removeThinkingIndicator() {
@@ -986,6 +991,31 @@
 
       // Blur to dismiss keyboard on mobile
       inputEl.blur();
+    }
+
+    function sendStop() {
+      // Send interrupt signal (ESC) to Claude process
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      const payload = { type: 'interrupt' };
+      ws.send(JSON.stringify(payload));
+
+      // Hide stop button and clean up indicators
+      stopBtn.classList.remove('visible');
+      removeThinkingIndicator();
+      removeActivityIndicator();
+      removeToolIndicator();
+
+      // Show a system message to indicate the stop
+      addSystemMessage('Interrupted by user');
+    }
+
+    function showStopButton() {
+      stopBtn.classList.add('visible');
+    }
+
+    function hideStopButton() {
+      stopBtn.classList.remove('visible');
     }
 
     function clearPendingImage() {
@@ -1174,6 +1204,7 @@
     });
 
     sendBtn.addEventListener('click', send);
+    stopBtn.addEventListener('click', sendStop);
     newChatBtn.addEventListener('click', () => createSession());
     startChatBtn.addEventListener('click', () => createSession());
 
