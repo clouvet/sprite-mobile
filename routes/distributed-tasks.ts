@@ -181,6 +181,7 @@ TASK_PROMPT_EOF`;
 
     proc.on("close", (code) => {
       console.log(`Claude session completed on ${spriteName}, output length: ${output.length}`);
+      console.log(`Claude output: ${output}`);
       if (code === 0 || output.length > 0) {
         // Consider it successful if we got output, even if exit code is non-zero
         resolve();
