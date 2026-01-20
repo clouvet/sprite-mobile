@@ -532,6 +532,17 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     })();
   }
 
+  // POST /api/distributed-tasks/check-and-start - Check for tasks and start in detachable session
+  if (req.method === "POST" && path === "/api/distributed-tasks/check-and-start") {
+    return (async () => {
+      const result = await distributedTasks.checkAndStartTask({ body: {}, params: {}, method: "POST" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 503 });
+      }
+      return Response.json(result);
+    })();
+  }
+
   // POST /api/distributed-tasks/complete - Complete current task
   if (req.method === "POST" && path === "/api/distributed-tasks/complete") {
     return (async () => {
