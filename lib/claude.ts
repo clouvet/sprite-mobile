@@ -1,6 +1,6 @@
 import { spawn, type Subprocess } from "bun";
 import type { BackgroundProcess } from "./types";
-import { saveMessage, updateSession } from "./storage";
+import { saveMessage, updateSession, saveInProgressMessage, clearInProgressMessage } from "./storage";
 
 // Background process tracking - persists across WebSocket reconnects
 export const backgroundProcesses = new Map<string, BackgroundProcess>();
@@ -74,6 +74,10 @@ export async function handleClaudeOutput(bg: BackgroundProcess) {
   const reader = bg.process.stdout.getReader();
   const decoder = new TextDecoder();
 
+  // Track last save time to debounce saves during streaming
+  let lastSaveTime = 0;
+  const SAVE_INTERVAL = 500; // Save at most every 500ms during streaming
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -97,7 +101,19 @@ export async function handleClaudeOutput(bg: BackgroundProcess) {
             updateSession(bg.sessionId, { claudeSessionId: msg.session_id });
           }
 
-          // Accumulate assistant text
+          // Accumulate assistant text from streaming deltas
+          if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta" && msg.delta?.text) {
+            bg.assistantBuffer += msg.delta.text;
+
+            // Progressively save during streaming to survive refreshes
+            const now = Date.now();
+            if (now - lastSaveTime >= SAVE_INTERVAL && bg.assistantBuffer.length > 0) {
+              lastSaveTime = now;
+              saveInProgressMessage(bg.sessionId, bg.assistantBuffer);
+            }
+          }
+
+          // Accumulate assistant text from full message (for reconnection)
           if (msg.type === "assistant" && msg.message?.content) {
             const content = msg.message.content;
             if (Array.isArray(content)) {
@@ -110,11 +126,14 @@ export async function handleClaudeOutput(bg: BackgroundProcess) {
 
           // Save complete assistant message
           if (msg.type === "result" && bg.assistantBuffer) {
+            // Final save - mark as complete
             saveMessage(bg.sessionId, {
               role: "assistant",
               content: bg.assistantBuffer,
               timestamp: Date.now(),
             });
+            // Clear any in-progress message marker
+            clearInProgressMessage(bg.sessionId);
             updateSession(bg.sessionId, {
               lastMessageAt: Date.now(),
               lastMessage: bg.assistantBuffer.slice(0, 100),
@@ -132,6 +151,15 @@ export async function handleClaudeOutput(bg: BackgroundProcess) {
   }
 
   // Process finished - clean up
+  // Save any remaining buffered content as a message if the process ended abruptly
+  if (bg.assistantBuffer) {
+    saveMessage(bg.sessionId, {
+      role: "assistant",
+      content: bg.assistantBuffer,
+      timestamp: Date.now(),
+    });
+    clearInProgressMessage(bg.sessionId);
+  }
   console.log(`Claude process finished for session ${bg.sessionId}`);
   updateSession(bg.sessionId, { isProcessing: false });
   backgroundProcesses.delete(bg.sessionId);
