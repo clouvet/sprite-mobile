@@ -577,6 +577,31 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     })();
   }
 
+  // POST /api/distributed-tasks/:id/cancel - Cancel a task
+  if (req.method === "POST" && path.match(/^\/api\/distributed-tasks\/[^/]+\/cancel$/)) {
+    const id = path.split("/")[3];
+    return (async () => {
+      const result = await distributedTasks.cancelTask({ body: {}, params: { id }, method: "POST" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 400 });
+      }
+      return Response.json(result);
+    })();
+  }
+
+  // POST /api/distributed-tasks/:id/reassign - Reassign a task
+  if (req.method === "POST" && path.match(/^\/api\/distributed-tasks\/[^/]+\/reassign$/)) {
+    const id = path.split("/")[3];
+    return (async () => {
+      const body = await req.json();
+      const result = await distributedTasks.reassignTask({ body, params: { id }, method: "POST" } as any);
+      if (result.error) {
+        return Response.json(result, { status: result.status || 400 });
+      }
+      return Response.json(result);
+    })();
+  }
+
   // GET /api/distributed-tasks/:id - Get a specific task
   if (req.method === "GET" && path.match(/^\/api\/distributed-tasks\/[^/]+$/)) {
     const id = path.split("/")[3];

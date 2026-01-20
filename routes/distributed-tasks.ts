@@ -360,3 +360,45 @@ export async function getStatus(_req: Request): Promise<any> {
 
   return { sprites: statuses };
 }
+
+export async function cancelTask(req: Request): Promise<any> {
+  const { id } = req.params;
+
+  if (!tasks.isTasksNetworkEnabled()) {
+    return { error: "Distributed tasks not configured", status: 503 };
+  }
+
+  try {
+    await tasks.cancelTask(id);
+    return { message: "Task cancelled successfully", taskId: id };
+  } catch (err: any) {
+    return { error: err.message, status: 400 };
+  }
+}
+
+export async function reassignTask(req: Request): Promise<any> {
+  const { id } = req.params;
+  const { assignedTo } = req.body;
+
+  if (!assignedTo) {
+    return { error: "Missing required field: assignedTo", status: 400 };
+  }
+
+  if (!tasks.isTasksNetworkEnabled()) {
+    return { error: "Distributed tasks not configured", status: 503 };
+  }
+
+  try {
+    await tasks.reassignTask(id, assignedTo);
+
+    // Wake the new sprite to pick up the task
+    wakeAndNotifySprite(assignedTo).catch(err => {
+      console.error(`Failed to wake sprite ${assignedTo}:`, err);
+    });
+
+    const task = await tasks.getTask(id);
+    return { message: "Task reassigned successfully", task };
+  } catch (err: any) {
+    return { error: err.message, status: 400 };
+  }
+}

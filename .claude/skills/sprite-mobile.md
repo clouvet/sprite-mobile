@@ -567,8 +567,9 @@ sprite-mobile supports distributing tasks across multiple sprites in your networ
 
 **Tasks**: Work items that can be assigned to sprites
 - Each task has: title, description, assigned sprite, status, and result
-- Status: `pending` → `in_progress` → `completed`/`failed`
+- Status: `pending` → `in_progress` → `completed`/`failed`/`abandoned`
 - Tasks are queued per sprite and executed sequentially
+- Tasks can be cancelled (status becomes `abandoned`) or reassigned to different sprites
 - Task data stored in Tigris bucket (`tasks/` and `task-queues/` prefixes)
 
 **Task Queue**: Each sprite has its own queue
@@ -629,6 +630,57 @@ curl -X POST http://localhost:8081/api/distributed-tasks/complete \
 ```
 
 The sprite will automatically check for the next queued task.
+
+### Cancelling Tasks
+
+Any sprite can cancel a task by ID:
+
+```bash
+# Cancel a task (removes from queue and marks as abandoned)
+curl -X POST http://localhost:8081/api/distributed-tasks/{task-id}/cancel \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Optional cancellation reason"}'
+```
+
+This will:
+- Mark the task as `abandoned`
+- Remove it from the assigned sprite's queue
+- Clear it from the current task if it's in progress
+- Store optional cancellation reason
+
+**From chat:**
+```
+"Cancel task {task-id}"
+"Cancel the task assigned to hanoi-winter"
+```
+
+### Reassigning Tasks
+
+Any sprite can reassign a task to a different sprite:
+
+```bash
+# Reassign a task to a different sprite
+curl -X POST http://localhost:8081/api/distributed-tasks/{task-id}/reassign \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newAssignee": "new-sprite-name",
+    "reason": "Optional reassignment reason"
+  }'
+```
+
+This will:
+- Remove task from old sprite's queue
+- Reset task status to `pending`
+- Add task to new sprite's queue
+- Wake the new sprite to pick up the task
+- Store optional reassignment reason
+- Cannot reassign completed or failed tasks
+
+**From chat:**
+```
+"Reassign task {task-id} to hanoi-winter"
+"Move the task from sad-clown to eternus-failurus"
+```
 
 ### Querying Status
 
@@ -698,11 +750,55 @@ The tasks modal (📋 button in header) shows:
 | POST | `/api/distributed-tasks/distribute` | Distribute tasks to sprites |
 | POST | `/api/distributed-tasks/check` | Check for new tasks (called by sprite exec) |
 | POST | `/api/distributed-tasks/complete` | Mark current task complete |
+| POST | `/api/distributed-tasks/:id/cancel` | Cancel a task (aborts if in progress, removes from queue if pending) |
+| POST | `/api/distributed-tasks/:id/reassign` | Reassign a task to a different sprite (updates queue accordingly) |
 | GET | `/api/distributed-tasks` | List all tasks |
 | GET | `/api/distributed-tasks/mine` | Get my tasks (current + queued) |
 | GET | `/api/distributed-tasks/status` | Get all sprites status |
 | GET | `/api/distributed-tasks/:id` | Get specific task |
 | PATCH | `/api/distributed-tasks/:id` | Update task |
+
+### Cancelling Tasks
+
+**From Chat:**
+```
+"Cancel task {task-id}"
+"Abort the task that hanoi-winter is working on"
+```
+
+**Via API:**
+```bash
+curl -X POST http://localhost:8081/api/distributed-tasks/{task-id}/cancel \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Optional cancellation reason"}'
+```
+
+**Behavior:**
+- If task is `pending`: Removes from queue, marks as `cancelled`
+- If task is `in_progress`: Marks as `cancelled` (sprite should check status and stop working)
+- Updates task with `cancelledAt` timestamp and optional `cancelReason`
+
+### Reassigning Tasks
+
+**From Chat:**
+```
+"Reassign task {task-id} to eternus-failurus"
+"Move hanoi-winter's queued tasks to sad-clown"
+```
+
+**Via API:**
+```bash
+curl -X POST http://localhost:8081/api/distributed-tasks/{task-id}/reassign \
+  -H "Content-Type: application/json" \
+  -d '{"newAssignedTo": "eternus-failurus"}'
+```
+
+**Behavior:**
+- Updates task's `assignedTo` field
+- Removes from old sprite's queue
+- Adds to new sprite's queue
+- Wakes new sprite using `sprite exec`
+- Only works for `pending` tasks (cannot reassign in-progress tasks)
 
 ### Important Notes
 
