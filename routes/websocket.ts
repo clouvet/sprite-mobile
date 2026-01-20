@@ -38,6 +38,7 @@ export const websocketHandlers = {
       const inProgress = getInProgressMessage(sessionId);
       const allMessages = inProgress ? [...messages, inProgress] : messages;
       if (allMessages.length > 0) {
+        console.log(`[${sessionId}] Sending history to new client: ${allMessages.length} messages (${inProgress ? 'including in-progress' : 'all complete'})`);
         ws.send(JSON.stringify({ type: "history", messages: allMessages }));
       }
 
