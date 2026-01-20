@@ -1592,6 +1592,9 @@
       const createdAt = new Date(task.createdAt);
       const statusLabel = task.status.replace('_', ' ');
 
+      // Show action buttons for tasks that aren't completed, failed, or abandoned
+      const showActions = task.status !== 'completed' && task.status !== 'failed' && task.status !== 'abandoned';
+
       return `
         <div class="task-item status-${task.status}">
           <div class="task-title">${escapeHtml(task.title)}</div>
@@ -1607,9 +1610,101 @@
               ${task.result.error ? `<br><span style="color: #ef4444">${escapeHtml(task.result.error)}</span>` : ''}
             </div>
           ` : ''}
+          ${showActions ? `
+            <div class="task-actions">
+              <button class="task-action-btn cancel-btn" data-task-id="${task.id}">Cancel</button>
+              <button class="task-action-btn reassign-btn" data-task-id="${task.id}">Reassign</button>
+            </div>
+          ` : ''}
         </div>
       `;
     }
+
+    async function cancelTask(taskId) {
+      if (!confirm('Are you sure you want to cancel this task?')) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/distributed-tasks/${taskId}/cancel`, {
+          method: 'POST',
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          alert(`Failed to cancel task: ${data.error}`);
+        } else {
+          alert('Task cancelled successfully');
+          loadTasks(); // Refresh the task list
+        }
+      } catch (err) {
+        alert('Failed to cancel task');
+      }
+    }
+
+    async function reassignTask(taskId) {
+      // Fetch available sprites
+      let sprites = [];
+      try {
+        const res = await fetch('/api/distributed-tasks/status');
+        const data = await res.json();
+        if (!data.error) {
+          sprites = data.sprites.map(s => s.spriteName);
+        }
+      } catch (err) {
+        console.error('Failed to fetch sprites:', err);
+      }
+
+      // Prompt user for new sprite name
+      const newSprite = prompt(
+        `Enter the sprite name to reassign this task to${sprites.length > 0 ? '\n\nAvailable sprites:\n' + sprites.join('\n') : ''}:`
+      );
+
+      if (!newSprite || newSprite.trim() === '') {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/distributed-tasks/${taskId}/reassign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignedTo: newSprite.trim() }),
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          alert(`Failed to reassign task: ${data.error}`);
+        } else {
+          alert('Task reassigned successfully');
+          loadTasks(); // Refresh the task list
+        }
+      } catch (err) {
+        alert('Failed to reassign task');
+      }
+    }
+
+    // Event delegation for task action buttons
+    myTasksList.addEventListener('click', (e) => {
+      if (e.target.classList.contains('cancel-btn')) {
+        const taskId = e.target.getAttribute('data-task-id');
+        cancelTask(taskId);
+      } else if (e.target.classList.contains('reassign-btn')) {
+        const taskId = e.target.getAttribute('data-task-id');
+        reassignTask(taskId);
+      }
+    });
+
+    allTasksList.addEventListener('click', (e) => {
+      if (e.target.classList.contains('cancel-btn')) {
+        const taskId = e.target.getAttribute('data-task-id');
+        cancelTask(taskId);
+      } else if (e.target.classList.contains('reassign-btn')) {
+        const taskId = e.target.getAttribute('data-task-id');
+        reassignTask(taskId);
+      }
+    });
 
     tasksBtn.addEventListener('click', openTasksModal);
     closeTasksModal.addEventListener('click', closeTasksModalFn);

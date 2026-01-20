@@ -889,6 +889,43 @@
       font-size: 12px;
     }
 
+    .task-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .task-action-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .task-action-btn.cancel-btn {
+      background: var(--bg-tertiary);
+      color: #ef4444;
+      border-color: #ef4444;
+    }
+
+    .task-action-btn.cancel-btn:hover {
+      background: #ef4444;
+      color: white;
+    }
+
+    .task-action-btn.reassign-btn {
+      background: var(--bg-tertiary);
+      color: #4a9eff;
+      border-color: #4a9eff;
+    }
+
+    .task-action-btn.reassign-btn:hover {
+      background: #4a9eff;
+      color: white;
+    }
+
     .sprite-status-item {
       padding: 12px;
       background: var(--bg-tertiary);

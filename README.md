@@ -162,9 +162,29 @@ The distributed tasks system provides these API endpoints:
 | POST | `/api/distributed-tasks/distribute` | Distribute tasks round-robin |
 | POST | `/api/distributed-tasks/check` | Check for new tasks in queue |
 | POST | `/api/distributed-tasks/complete` | Mark a task complete |
+| POST | `/api/distributed-tasks/:id/cancel` | Cancel a task (aborts if in progress, removes from queue if pending) |
+| POST | `/api/distributed-tasks/:id/reassign` | Reassign a task to a different sprite (updates queue accordingly) |
 | GET | `/api/distributed-tasks` | List all tasks |
 | GET | `/api/distributed-tasks/mine` | Get tasks for this sprite |
 | GET | `/api/distributed-tasks/status` | Get status of all sprites |
+| GET | `/api/distributed-tasks/:id` | Get a specific task by ID |
+| PATCH | `/api/distributed-tasks/:id` | Update a task's status/fields |
+
+**Cancellation:**
+```bash
+# Cancel a task by ID
+curl -X POST http://localhost:8081/api/distributed-tasks/{task-id}/cancel \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Optional cancellation reason"}'
+```
+
+**Reassignment:**
+```bash
+# Reassign a task to a different sprite
+curl -X POST http://localhost:8081/api/distributed-tasks/{task-id}/reassign \
+  -H "Content-Type: application/json" \
+  -d '{"newAssignedTo": "target-sprite-name"}'
+```
 
 ### Data Model
 
@@ -176,17 +196,27 @@ Tasks are stored in your shared Tigris bucket with the following structure:
   "id": "uuid",
   "assignedTo": "sprite-name",
   "assignedBy": "sprite-name",
-  "status": "pending|in_progress|completed|failed",
+  "status": "pending|in_progress|completed|failed|cancelled",
   "title": "Task title",
   "description": "Full task description",
   "createdAt": "ISO date",
   "startedAt": "ISO date",
   "completedAt": "ISO date",
+  "cancelledAt": "ISO date",
   "sessionId": "session-id",
   "result": {
     "summary": "What was accomplished",
     "success": true
-  }
+  },
+  "cancellationReason": "Optional reason for cancellation",
+  "reassignmentHistory": [
+    {
+      "from": "old-sprite",
+      "to": "new-sprite",
+      "at": "ISO date",
+      "reason": "Optional reason"
+    }
+  ]
 }
 ```
 
@@ -505,9 +535,13 @@ All data is stored in the `data/` directory:
 | POST | `/api/distributed-tasks/distribute` | Distribute tasks round-robin |
 | POST | `/api/distributed-tasks/check` | Check for new tasks |
 | POST | `/api/distributed-tasks/complete` | Mark task complete |
+| POST | `/api/distributed-tasks/:id/cancel` | Cancel a task by ID |
+| POST | `/api/distributed-tasks/:id/reassign` | Reassign a task to a different sprite |
 | GET | `/api/distributed-tasks` | List all tasks |
 | GET | `/api/distributed-tasks/mine` | Get this sprite's tasks |
 | GET | `/api/distributed-tasks/status` | Get all sprites status |
+| GET | `/api/distributed-tasks/:id` | Get a specific task by ID |
+| PATCH | `/api/distributed-tasks/:id` | Update a task's status/fields |
 
 ### WebSocket
 

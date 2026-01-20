@@ -337,3 +337,85 @@ export async function getAllSpritesStatus(): Promise<{ spriteName: string; curre
     return [];
   }
 }
+
+export async function cancelTask(taskId: string): Promise<void> {
+  if (!s3Client || !bucketName) {
+    throw new Error("Tasks network not initialized");
+  }
+
+  const task = await getTask(taskId);
+  if (!task) {
+    throw new Error(`Task ${taskId} not found`);
+  }
+
+  // Update task status to cancelled (using "abandoned" status)
+  await updateTask(taskId, {
+    status: "abandoned",
+    completedAt: new Date().toISOString(),
+  });
+
+  // Remove from the assigned sprite's queue
+  const queue = await getTaskQueue(task.assignedTo);
+
+  // Remove from queued tasks
+  const queuedIndex = queue.queuedTasks.indexOf(taskId);
+  if (queuedIndex !== -1) {
+    queue.queuedTasks.splice(queuedIndex, 1);
+    await updateTaskQueue(queue);
+  }
+
+  // If it's the current task, clear it
+  if (queue.currentTask === taskId) {
+    queue.currentTask = null;
+    await updateTaskQueue(queue);
+  }
+
+  console.log(`Cancelled task ${taskId}`);
+}
+
+export async function reassignTask(taskId: string, newAssignedTo: string): Promise<void> {
+  if (!s3Client || !bucketName) {
+    throw new Error("Tasks network not initialized");
+  }
+
+  const task = await getTask(taskId);
+  if (!task) {
+    throw new Error(`Task ${taskId} not found`);
+  }
+
+  const oldAssignedTo = task.assignedTo;
+
+  // Can't reassign completed or failed tasks
+  if (task.status === "completed" || task.status === "failed") {
+    throw new Error(`Cannot reassign ${task.status} task`);
+  }
+
+  // Remove from old sprite's queue
+  const oldQueue = await getTaskQueue(oldAssignedTo);
+
+  // Remove from queued tasks
+  const queuedIndex = oldQueue.queuedTasks.indexOf(taskId);
+  if (queuedIndex !== -1) {
+    oldQueue.queuedTasks.splice(queuedIndex, 1);
+    await updateTaskQueue(oldQueue);
+  }
+
+  // If it's the current task, clear it
+  if (oldQueue.currentTask === taskId) {
+    oldQueue.currentTask = null;
+    await updateTaskQueue(oldQueue);
+  }
+
+  // Update task with new assignment
+  await updateTask(taskId, {
+    assignedTo: newAssignedTo,
+    status: "pending",
+    startedAt: undefined,
+    sessionId: undefined,
+  });
+
+  // Add to new sprite's queue
+  await addTaskToQueue(newAssignedTo, taskId);
+
+  console.log(`Reassigned task ${taskId} from ${oldAssignedTo} to ${newAssignedTo}`);
+}
