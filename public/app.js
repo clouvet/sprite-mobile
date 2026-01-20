@@ -171,7 +171,7 @@
 
     // Public URL keepalive - pings the public URL every 30 seconds to keep sprite awake
     let spritePublicUrl = null;
-    let spriteName = 'Sprite Code'; // Default, will be updated from publicUrl
+    let spriteName = 'Sprite Mobile'; // Default, will be updated from publicUrl
     let publicKeepaliveInterval = null;
 
     // Extract and sanitize hostname from public URL
@@ -191,7 +191,7 @@
 
     // Update displayed sprite name
     function updateSpriteName(name) {
-      spriteName = name || 'Sprite Code';
+      spriteName = name || 'Sprite MObile';
       const emojiHtml = '<span class="sprite-emoji">👾</span>';
       const displayHtml = `${escapeHtml(spriteName)} ${emojiHtml}`;
       // Update header title if showing empty state

@@ -1,7 +1,7 @@
-// Service Worker for Sprite Code PWA
+// Service Worker for Sprite Mobile PWA
 // Caches shell for offline-first loading and stores public URL for sprite wake-up
 
-const CACHE_VERSION = 'v37';
+const CACHE_VERSION = 'v38';
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const CONFIG_CACHE = `config-${CACHE_VERSION}`;
 
@@ -67,7 +67,7 @@ const OFFLINE_HTML = `<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sprite Code - Offline</title>
+<title>Sprite Mobile - Offline</title>
 <style>
   body{margin:0;background:#1a1a2e;color:#e5e5e5;font-family:-apple-system,sans-serif;
   display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;padding:20px;box-sizing:border-box}
