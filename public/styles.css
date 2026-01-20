@@ -316,6 +316,7 @@
       flex-shrink: 0;
       transition: all 0.15s;
       opacity: 1;
+      margin-bottom: 3px;
     }
 
     #stop-btn svg {
