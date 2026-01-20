@@ -130,13 +130,23 @@ export const websocketHandlers = {
       const data = JSON.parse(message.toString());
 
       if (data.type === "interrupt") {
-        // Send ESC character to Claude process to interrupt
+        // Kill the Claude process to stop it immediately
         try {
-          bg.process.stdin.write("\x1b"); // ESC character
-          bg.process.stdin.flush();
-          console.log(`Interrupt signal sent to session ${sessionId}`);
+          console.log(`Interrupting Claude process for session ${sessionId}`);
+          bg.process.kill();
+          backgroundProcesses.delete(sessionId);
+          updateSession(sessionId, { isProcessing: false });
+
+          // Notify clients that processing stopped
+          for (const client of bg.clients) {
+            if (client.readyState === 1) {
+              try {
+                client.send(JSON.stringify({ type: "result" }));
+              } catch {}
+            }
+          }
         } catch (err) {
-          console.error("Error sending interrupt:", err);
+          console.error("Error interrupting process:", err);
         }
         return;
       }
