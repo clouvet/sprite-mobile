@@ -1005,9 +1005,6 @@
       removeThinkingIndicator();
       removeActivityIndicator();
       removeToolIndicator();
-
-      // Show a system message to indicate the stop
-      addSystemMessage('Interrupted by user');
     }
 
     function enableStopButton() {

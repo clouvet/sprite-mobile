@@ -134,7 +134,6 @@ export async function handleClaudeOutput(bg: BackgroundProcess) {
   // Process finished - clean up
   console.log(`Claude process finished for session ${bg.sessionId}`);
   updateSession(bg.sessionId, { isProcessing: false });
-  trySend(bg, JSON.stringify({ type: "system", message: "Claude finished" }));
   backgroundProcesses.delete(bg.sessionId);
 }
 
