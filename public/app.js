@@ -1011,7 +1011,13 @@
     }
 
     function showStopButton() {
-      stopBtn.classList.add('visible');
+      console.log('showStopButton called, stopBtn:', stopBtn);
+      if (stopBtn) {
+        stopBtn.classList.add('visible');
+        console.log('Stop button should now be visible');
+      } else {
+        console.error('stopBtn element not found!');
+      }
     }
 
     function hideStopButton() {
