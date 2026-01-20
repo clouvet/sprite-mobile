@@ -303,12 +303,12 @@
     }
 
     #stop-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: transparent;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
       border: none;
-      color: #ef4444;
+      color: #ffffff;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -318,18 +318,23 @@
       opacity: 1;
     }
 
+    #stop-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
     #stop-btn:disabled {
       opacity: 0.3;
       cursor: not-allowed;
     }
 
     #stop-btn:not(:disabled):active {
-      background: rgba(239, 68, 68, 0.2);
       transform: scale(0.95);
+      opacity: 0.9;
     }
 
     #stop-btn:not(:disabled):hover {
-      background: rgba(239, 68, 68, 0.1);
+      opacity: 0.85;
     }
 
     #status {
