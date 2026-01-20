@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import type { BackgroundProcess, StoredMessage } from "../lib/types";
-import { loadMessages, saveMessage, getSession, updateSession, UPLOADS_DIR } from "../lib/storage";
+import { loadMessages, saveMessage, getSession, updateSession, UPLOADS_DIR, getInProgressMessage } from "../lib/storage";
 import {
   backgroundProcesses, spawnClaude, generateChatName,
   handleClaudeOutput, handleClaudeStderr
@@ -33,10 +33,12 @@ export const websocketHandlers = {
       console.log(`Client joined session ${sessionId} (${existingBg.clients.size + 1} clients now)`);
       existingBg.clients.add(ws);
 
-      // Send history to this new client
+      // Send history to this new client (including any in-progress message)
       const messages = loadMessages(sessionId);
-      if (messages.length > 0) {
-        ws.send(JSON.stringify({ type: "history", messages }));
+      const inProgress = getInProgressMessage(sessionId);
+      const allMessages = inProgress ? [...messages, inProgress] : messages;
+      if (allMessages.length > 0) {
+        ws.send(JSON.stringify({ type: "history", messages: allMessages }));
       }
 
       // Only notify if Claude is actively generating a response
@@ -49,10 +51,12 @@ export const websocketHandlers = {
 
     console.log(`Client connected to session ${sessionId}${claudeSessionId ? ` (resuming ${claudeSessionId})` : ""}`);
 
-    // Send stored message history
+    // Send stored message history (including any in-progress message)
     const messages = loadMessages(sessionId);
-    if (messages.length > 0) {
-      ws.send(JSON.stringify({ type: "history", messages }));
+    const inProgress = getInProgressMessage(sessionId);
+    const allMessages = inProgress ? [...messages, inProgress] : messages;
+    if (allMessages.length > 0) {
+      ws.send(JSON.stringify({ type: "history", messages: allMessages }));
     }
 
     // Spawn new Claude process

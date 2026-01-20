@@ -93,3 +93,35 @@ export function deleteMessagesFile(sessionId: string) {
 export function saveMessages(sessionId: string, messages: StoredMessage[]) {
   writeFileSync(getMessagesFile(sessionId), JSON.stringify(messages, null, 2));
 }
+
+// In-progress message storage for surviving refreshes
+function getInProgressFile(sessionId: string): string {
+  return join(MESSAGES_DIR, `${sessionId}.inprogress.json`);
+}
+
+export function saveInProgressMessage(sessionId: string, content: string) {
+  const file = getInProgressFile(sessionId);
+  const msg: StoredMessage = {
+    role: "assistant",
+    content,
+    timestamp: Date.now(),
+  };
+  writeFileSync(file, JSON.stringify(msg, null, 2));
+}
+
+export function clearInProgressMessage(sessionId: string) {
+  const file = getInProgressFile(sessionId);
+  try {
+    if (existsSync(file)) unlinkSync(file);
+  } catch {}
+}
+
+export function getInProgressMessage(sessionId: string): StoredMessage | null {
+  const file = getInProgressFile(sessionId);
+  try {
+    if (existsSync(file)) {
+      return JSON.parse(readFileSync(file, "utf-8"));
+    }
+  } catch {}
+  return null;
+}

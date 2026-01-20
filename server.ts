@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, watch } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { ensureDirectories, getSession } from "./lib/storage";
 import { cleanupStaleProcesses } from "./lib/claude";
@@ -136,20 +136,20 @@ if (tasksEnabled) {
   console.log("Distributed tasks disabled (no credentials)");
 }
 
-// Watch public directory for changes and notify clients to reload
-let reloadDebounce: ReturnType<typeof setTimeout> | null = null;
-watch(PUBLIC_DIR, { recursive: true }, (event, filename) => {
-  // Debounce to avoid multiple reloads for rapid changes
-  if (reloadDebounce) clearTimeout(reloadDebounce);
-  reloadDebounce = setTimeout(() => {
-    console.log(`File changed: ${filename}, notifying ${allClients.size} clients to reload`);
-    const msg = JSON.stringify({ type: "reload" });
-    for (const ws of allClients) {
-      try {
-        if (ws.readyState === 1) ws.send(msg);
-      } catch {}
-    }
-  }, 300);
-});
+// Hot-reloading disabled to prevent constant app refreshes during conversations
+// If you need hot-reload during development, uncomment this block:
+// let reloadDebounce: ReturnType<typeof setTimeout> | null = null;
+// watch(PUBLIC_DIR, { recursive: true }, (event, filename) => {
+//   if (reloadDebounce) clearTimeout(reloadDebounce);
+//   reloadDebounce = setTimeout(() => {
+//     console.log(`File changed: ${filename}, notifying ${allClients.size} clients to reload`);
+//     const msg = JSON.stringify({ type: "reload" });
+//     for (const ws of allClients) {
+//       try {
+//         if (ws.readyState === 1) ws.send(msg);
+//       } catch {}
+//     }
+//   }, 300);
+// });
 
 console.log(`Claude Mobile server running on http://localhost:${PORT}`);

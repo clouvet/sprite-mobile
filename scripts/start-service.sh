@@ -14,5 +14,5 @@ if [ -f "$HOME/.sprite-mobile/.env" ]; then
     chmod 600 "$HOME/.sprite-mobile/.env"
 fi
 
-# Start the service
-exec bun --hot run "$HOME/.sprite-mobile/server.ts"
+# Start the service (--hot removed to prevent refreshes during conversations)
+exec bun run "$HOME/.sprite-mobile/server.ts"
