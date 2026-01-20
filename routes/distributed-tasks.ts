@@ -2,6 +2,14 @@ import type { Request } from "express";
 import * as tasks from "../lib/distributed-tasks";
 import { discoverSprites } from "../lib/network";
 import { spawn } from "child_process";
+import type { BackgroundProcess } from "../lib/types";
+import {
+  backgroundProcesses,
+  spawnClaude,
+  handleClaudeOutput,
+  handleClaudeStderr,
+} from "../lib/claude";
+import { getSession } from "../lib/storage";
 
 export async function createTask(req: Request): Promise<any> {
   const { assignedTo, title, description } = req.body;
@@ -153,6 +161,9 @@ export async function checkForTasks(_req: Request): Promise<any> {
     sessionId,
   });
 
+  // Spawn Claude process to work on the task autonomously
+  await spawnClaudeForTask(sessionId);
+
   return { message: "Started task", task: nextTask, sessionId };
 }
 
@@ -205,6 +216,46 @@ Get started!`;
   return newSession.id;
 }
 
+async function spawnClaudeForTask(sessionId: string): Promise<void> {
+  // Check if there's already a background process for this session
+  if (backgroundProcesses.has(sessionId)) {
+    console.log(`Claude process already running for session ${sessionId}`);
+    return;
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    throw new Error(`Session ${sessionId} not found`);
+  }
+
+  const cwd = session.cwd || process.env.HOME || "/home/sprite";
+  const claudeSessionId = session.claudeSessionId;
+
+  console.log(`Spawning autonomous Claude process for task session ${sessionId}`);
+
+  // Spawn Claude process
+  const process = spawnClaude(cwd, claudeSessionId);
+
+  // Create background process with no clients (runs detached)
+  const bg: BackgroundProcess = {
+    process,
+    buffer: "",
+    assistantBuffer: "",
+    sessionId,
+    clients: new Set(), // No WebSocket clients - runs in background
+    startedAt: Date.now(),
+    isGenerating: false,
+  };
+
+  backgroundProcesses.set(sessionId, bg);
+
+  // Start handling output - continues autonomously
+  handleClaudeOutput(bg);
+  handleClaudeStderr(bg);
+
+  console.log(`Claude process spawned for task session ${sessionId} - running autonomously`);
+}
+
 export async function completeTask(req: Request): Promise<any> {
   const { summary, success, error } = req.body;
 
@@ -234,6 +285,9 @@ export async function completeTask(req: Request): Promise<any> {
       // Create session for next task
       const sessionId = await createTaskSession(nextTask);
       await tasks.updateTask(nextTask.id, { sessionId });
+
+      // Spawn Claude process for the next task
+      await spawnClaudeForTask(sessionId);
 
       return { message: "Task completed, started next task", nextTask, sessionId };
     }
