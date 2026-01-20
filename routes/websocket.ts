@@ -84,10 +84,43 @@ export const websocketHandlers = {
     const sessionId = wsData.sessionId;
     if (!sessionId) return;
 
-    const bg = backgroundProcesses.get(sessionId);
+    let bg = backgroundProcesses.get(sessionId);
+
+    // If no background process exists, check if this is a user message and spawn a new one
     if (!bg) {
-      ws.send(JSON.stringify({ type: "error", message: "No active Claude process" }));
-      return;
+      try {
+        const data = JSON.parse(message.toString());
+
+        // Only spawn new process for user messages, not for interrupts
+        if (data.type === "user" && (data.content || data.imageId)) {
+          console.log(`Spawning new Claude process for session ${sessionId} after interruption`);
+          const session = getSession(sessionId);
+          const cwd = session?.cwd || process.env.HOME || "/home/sprite";
+          const claudeSessionId = session?.claudeSessionId;
+
+          const process = spawnClaude(cwd, claudeSessionId);
+          bg = {
+            process,
+            buffer: "",
+            assistantBuffer: "",
+            sessionId,
+            clients: new Set([ws]),
+            startedAt: Date.now(),
+            isGenerating: false,
+          };
+          backgroundProcesses.set(sessionId, bg);
+
+          // Start handling output
+          handleClaudeOutput(bg);
+          handleClaudeStderr(bg);
+        } else {
+          ws.send(JSON.stringify({ type: "error", message: "No active Claude process" }));
+          return;
+        }
+      } catch (err) {
+        ws.send(JSON.stringify({ type: "error", message: "No active Claude process" }));
+        return;
+      }
     }
 
     try {
