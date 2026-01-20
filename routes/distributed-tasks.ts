@@ -96,15 +96,20 @@ function summarizeDistribution(tasks: tasks.DistributedTask[]): Record<string, n
 
 async function wakeAndNotifySprite(spriteName: string): Promise<void> {
   return new Promise((resolve, reject) => {
+    // Use sprite exec to run a script that starts Claude for the task
+    // This creates a detachable session that keeps the sprite alive
+    const script = `
+      # Check for pending tasks and start Claude if there are any
+      curl -s -X POST http://localhost:8081/api/distributed-tasks/check-and-start
+    `;
+
     const proc = spawn("sprite", [
+      "exec",
       "-s",
       spriteName,
-      "exec",
-      "--",
-      "curl",
-      "-X",
-      "POST",
-      "http://localhost:8081/api/distributed-tasks/check"
+      "bash",
+      "-c",
+      script
     ]);
 
     let output = "";
@@ -118,10 +123,10 @@ async function wakeAndNotifySprite(spriteName: string): Promise<void> {
 
     proc.on("close", (code) => {
       if (code === 0) {
-        console.log(`Notified ${spriteName} to check for tasks`);
+        console.log(`Woke ${spriteName} and started task processing`);
         resolve();
       } else {
-        reject(new Error(`Failed to notify ${spriteName}: ${output}`));
+        reject(new Error(`Failed to wake ${spriteName}: ${output}`));
       }
     });
   });
