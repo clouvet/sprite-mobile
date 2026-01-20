@@ -828,9 +828,11 @@
       if (imageUrl) {
         imageHtml = `<img src="${imageUrl}" class="message-image" style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-bottom: 8px; display: block;">`;
       }
+      // Escape HTML but preserve newlines by converting them to <br> tags
+      const formattedText = text ? escapeHtml(text).replace(/\n/g, '<br>') : '';
       msg.innerHTML = `
         <div class="message-header">You</div>
-        <div class="message-content">${imageHtml}${text ? escapeHtml(text) : ''}</div>
+        <div class="message-content">${imageHtml}${formattedText}</div>
       `;
       messagesEl.appendChild(msg);
       scrollToBottom();

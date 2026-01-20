@@ -409,6 +409,7 @@
     .message.user .message-content {
       background: var(--user-bg);
       border-bottom-right-radius: 4px;
+      white-space: pre-wrap;
     }
 
     .message.assistant .message-content {
