@@ -85,7 +85,6 @@ Claude will have full context about sprite-mobile without needing to read throug
 - **Auto-update**: Pulls latest code when the service starts
 - **Sprite Network**: Automatic discovery of other sprites in your Fly.io organization via shared Tigris bucket
 - **Distributed Tasks**: Assign work across sprites, track progress, and automatically process task queues
-- **Hot Reloading**: Server code changes take effect immediately without restart
 - **Network Restart**: Run `scripts/restart-others.sh` to restart sprite-mobile on all other network sprites after pulling updates
 
 ## Distributed Tasks
