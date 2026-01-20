@@ -31,10 +31,19 @@ export async function createTask(req: Request): Promise<any> {
     description,
   });
 
-  // Wake the target sprite and tell it to check for tasks
-  // The target sprite will create the session locally and run Claude
-  wakeAndNotifySprite(assignedTo).catch(err => {
-    console.error(`Failed to wake ${assignedTo}:`, err);
+  // Build the task prompt
+  const taskPrompt = buildTaskPrompt(assignedBy, title, description);
+
+  // Mark as in progress
+  await tasks.updateTask(task.id, {
+    status: "in_progress",
+    startedAt: new Date().toISOString(),
+  });
+
+  // Start Claude on the target sprite using sprite exec
+  // This creates a detachable session that keeps the sprite alive
+  wakeAndStartTaskOnSprite(assignedTo, task.id, taskPrompt).catch(err => {
+    console.error(`Failed to start task on ${assignedTo}:`, err);
   });
 
   return { task };
@@ -95,19 +104,68 @@ function summarizeDistribution(tasks: tasks.DistributedTask[]): Record<string, n
   return distribution;
 }
 
-async function wakeAndStartTaskOnSprite(spriteName: string, sessionId: string): Promise<void> {
+function buildTaskPrompt(assignedBy: string, title: string, description: string): string {
+  return `You have been assigned a task by ${assignedBy}:
+
+**Task:** ${title}
+
+**Description:**
+${description}
+
+**Instructions:**
+1. Complete the task described above
+2. When finished, report back with a summary of what you accomplished
+3. Use the following API endpoint to mark the task complete:
+
+POST /api/distributed-tasks/complete
+{
+  "summary": "Your summary of what was accomplished",
+  "success": true
+}
+
+**Git Workflow (for repository work):**
+
+If this task involves working on a git repository, follow this workflow:
+
+1. **Before starting work**: Create a descriptive feature branch
+   - Use format: "feat/brief-description" for features, "fix/brief-description" for fixes
+   - Example: \`git checkout -b feat/add-user-authentication\`
+
+2. **After completing the work**:
+   - Stage and commit your changes with a clear commit message
+   - Example: \`git add . && git commit -m "Add user authentication feature"\`
+
+3. **Push and create PR**:
+   - Push the branch: \`git push -u origin <branch-name>\`
+   - Create a pull request using gh CLI:
+     \`gh pr create --title "Your PR title" --body "Description of changes"\`
+
+4. **Include PR URL in completion summary**:
+   - The completion summary should include the PR URL for tracking
+   - Example: "Completed task X. Created PR: https://github.com/org/repo/pull/123"
+
+**Note:** If the task does not involve a git repository or the repository is not configured for remote pushes, skip the git workflow and just complete the task normally.
+
+Get started!`;
+}
+
+async function wakeAndStartTaskOnSprite(spriteName: string, taskId: string, taskPrompt: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    // Use sprite exec to run Claude with --resume to use the session we already created
-    // This avoids shell escaping issues and creates a detachable session
-    console.log(`Starting Claude on ${spriteName} for session ${sessionId}`);
+    // Use sprite exec to run Claude with the prompt via heredoc to avoid escaping issues
+    // This creates a detachable session that keeps the sprite alive
+    console.log(`Starting Claude on ${spriteName} for task ${taskId}`);
+
+    const heredocScript = `claude << 'TASK_PROMPT_EOF'
+${taskPrompt}
+TASK_PROMPT_EOF`;
 
     const proc = spawn("sprite", [
       "exec",
       "-s",
       spriteName,
-      "claude",
-      "--resume",
-      sessionId
+      "bash",
+      "-c",
+      heredocScript
     ]);
 
     let output = "";
