@@ -1,7 +1,11 @@
     // Register service worker for offline shell and cached config
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
-        .then((reg) => console.log('Service worker registered'))
+        .then((reg) => {
+          console.log('Service worker registered');
+          // Force immediate update check
+          reg.update();
+        })
         .catch((err) => console.log('Service worker registration failed:', err));
     }
 
