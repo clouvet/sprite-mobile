@@ -159,14 +159,23 @@ async function wakeAndStartTaskOnSprite(spriteName: string, taskId: string, task
 ${taskPrompt}
 TASK_PROMPT_EOF`;
 
-    const proc = spawn("sprite", [
+    // Get the API key from environment to pass to the remote sprite
+    const apiKey = process.env.ANTHROPIC_API_KEY || '';
+
+    const args = [
       "exec",
       "-s",
       spriteName,
-      "bash",
-      "-c",
-      heredocScript
-    ]);
+    ];
+
+    // Pass API key if available
+    if (apiKey) {
+      args.push("-env", `ANTHROPIC_API_KEY=${apiKey}`);
+    }
+
+    args.push("bash", "-c", heredocScript);
+
+    const proc = spawn("sprite", args);
 
     let output = "";
     proc.stdout.on("data", (data) => {
