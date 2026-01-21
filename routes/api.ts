@@ -16,6 +16,38 @@ import * as distributedTasks from "./distributed-tasks";
 // Claude projects directory
 const CLAUDE_PROJECTS_DIR = join(process.env.HOME || "/home/sprite", ".claude", "projects");
 
+// Detect actual image format from file content (magic bytes)
+function detectImageFormat(buffer: ArrayBuffer): { ext: string; mediaType: string } | null {
+  const bytes = new Uint8Array(buffer);
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (bytes.length >= 8 &&
+      bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+    return { ext: "png", mediaType: "image/png" };
+  }
+
+  // JPEG: FF D8 FF
+  if (bytes.length >= 3 &&
+      bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return { ext: "jpg", mediaType: "image/jpeg" };
+  }
+
+  // GIF: 47 49 46 38 (GIF8)
+  if (bytes.length >= 4 &&
+      bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return { ext: "gif", mediaType: "image/gif" };
+  }
+
+  // WebP: 52 49 46 46 ... 57 45 42 50 (RIFF....WEBP)
+  if (bytes.length >= 12 &&
+      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+    return { ext: "webp", mediaType: "image/webp" };
+  }
+
+  return null;
+}
+
 interface ClaudeCliSession {
   sessionId: string;
   cwd: string;
@@ -434,23 +466,29 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
           return new Response("Only images are allowed", { status: 400 });
         }
 
+        const buffer = await file.arrayBuffer();
+
+        // Detect actual image format from file content
+        const imageFormat = detectImageFormat(buffer);
+        if (!imageFormat) {
+          return new Response("Unsupported or invalid image format", { status: 400 });
+        }
+
         const sessionUploadsDir = join(UPLOADS_DIR, sanitizedSessionId);
         if (!existsSync(sessionUploadsDir)) {
           mkdirSync(sessionUploadsDir, { recursive: true });
         }
 
         const id = generateId();
-        const ext = file.name.split(".").pop() || "png";
-        const filename = `${id}.${ext}`;
+        const filename = `${id}.${imageFormat.ext}`;
         const filePath = join(sessionUploadsDir, filename);
 
-        const buffer = await file.arrayBuffer();
         writeFileSync(filePath, Buffer.from(buffer));
 
         return Response.json({
           id,
           filename,
-          mediaType: file.type,
+          mediaType: imageFormat.mediaType,
           url: `/api/uploads/${sanitizedSessionId}/${filename}`,
         });
       } catch (err) {
