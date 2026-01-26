@@ -325,6 +325,57 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     })();
   }
 
+  // POST /api/sessions/:id/update-id
+  if (req.method === "POST" && path.match(/^\/api\/sessions\/[^/]+\/update-id$/)) {
+    return (async () => {
+      const oldId = path.split("/")[3];
+      const body = await req.json() as { newId: string };
+      const { newId } = body;
+
+      if (!newId) {
+        return new Response("Missing newId", { status: 400 });
+      }
+
+      const session = getSession(oldId);
+      if (!session) {
+        return new Response("Session not found", { status: 404 });
+      }
+
+      console.log(`[API] Updating session ID from ${oldId} to ${newId}`);
+
+      // Update sessions file
+      const sessions = loadSessions();
+      const sessionIndex = sessions.findIndex(s => s.id === oldId);
+      if (sessionIndex !== -1) {
+        sessions[sessionIndex].id = newId;
+        saveSessions(sessions);
+      }
+
+      // Rename messages file if it exists
+      const oldMessagesFile = join(process.env.HOME || "/home/sprite", ".sprite-mobile/data", `${oldId}.json`);
+      const newMessagesFile = join(process.env.HOME || "/home/sprite", ".sprite-mobile/data", `${newId}.json`);
+      try {
+        if (existsSync(oldMessagesFile)) {
+          const fs = await import("fs");
+          fs.renameSync(oldMessagesFile, newMessagesFile);
+          console.log(`[API] Renamed messages file from ${oldId}.json to ${newId}.json`);
+        }
+      } catch (err) {
+        console.error(`[API] Failed to rename messages file:`, err);
+      }
+
+      // Update background process map
+      const bg = backgroundProcesses.get(oldId);
+      if (bg) {
+        backgroundProcesses.delete(oldId);
+        backgroundProcesses.set(newId, bg);
+        console.log(`[API] Updated background process map`);
+      }
+
+      return Response.json({ success: true, oldId, newId });
+    })();
+  }
+
   // DELETE /api/sessions/:id
   if (req.method === "DELETE" && path.startsWith("/api/sessions/")) {
     const id = path.split("/")[3];

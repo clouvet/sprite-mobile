@@ -620,6 +620,36 @@
     function handleMessage(msg) {
       switch (msg.type) {
         case 'system':
+          // Handle Claude init message - update session ID to match Claude's UUID
+          if (msg.subtype === 'init' && msg.session_id && currentSession) {
+            const claudeUUID = msg.session_id;
+            if (currentSession.id !== claudeUUID) {
+              console.log(`[Client] Updating session ID from ${currentSession.id} to Claude UUID: ${claudeUUID}`);
+              const oldId = currentSession.id;
+              currentSession.id = claudeUUID;
+
+              // Update sessions list
+              const sessionIndex = sessions.findIndex(s => s.id === oldId);
+              if (sessionIndex !== -1) {
+                sessions[sessionIndex].id = claudeUUID;
+              }
+
+              // Update URL hash
+              history.replaceState(null, '', `#session=${claudeUUID}`);
+              notifyParentOfHashChange();
+
+              // Re-render sessions list to show updated ID
+              renderSessionsList();
+
+              // Notify backend to update session ID
+              fetch('/api/sessions/' + oldId + '/update-id', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newId: claudeUUID })
+              }).catch(err => console.error('Failed to update session ID on backend:', err));
+            }
+          }
+
           if (msg.message && !msg.message.includes('Connected')) {
             addSystemMessage(msg.message);
           }
