@@ -509,6 +509,8 @@ SPRITE_MOBILE_REPO=https://github.com/org/sprite-mobile
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `PORT` | Server port | `8081` |
+| `USE_GO_HUB` | Enable claude-hub for multi-client sync (default: `true`) | `true` |
+| `GO_HUB_URL` | WebSocket URL for claude-hub | `ws://localhost:9090` |
 | `SPRITE_PUBLIC_URL` | Public URL for waking sprite | `https://my-sprite.sprites.app` |
 | `TAILSCALE_SERVE_URL` | Tailscale HTTPS URL | `https://my-sprite.ts.net` |
 | `SPRITE_HOSTNAME` | Hostname for sprite network registration | `my-sprite` |
@@ -523,6 +525,68 @@ These are automatically configured by the setup script and stored in `~/.sprite-
 
 ## Architecture
 
+### Overview
+
+sprite-mobile uses a multi-service architecture for reliable multi-client Claude Code session management:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Public Internet                          │
+│                  https://my-sprite.sprites.app                   │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                     ┌─────────▼─────────┐
+                     │  tailnet-gate     │  Port 8080
+                     │  (Public entry)   │  • Wakes sprite
+                     │                   │  • Embeds Tailscale URL in iframe
+                     └─────────┬─────────┘  • WebSocket keepalive
+                               │
+                     ┌─────────▼─────────┐
+                     │  Tailscale HTTPS  │
+                     │  my-sprite.ts.net │
+                     └─────────┬─────────┘
+                               │
+                     ┌─────────▼─────────┐
+                     │  sprite-mobile    │  Port 8081
+                     │  (Web UI + API)   │  • Serves PWA interface
+                     │                   │  • Proxies WebSocket to claude-hub
+                     └─────────┬─────────┘  • Maintains UI metadata
+                               │
+                               │ WebSocket Proxy
+                               │
+                     ┌─────────▼─────────┐
+                     │   claude-hub      │  Port 9090
+                     │  (Session Mgr)    │  • Spawns/manages Claude processes
+                     │                   │  • Multi-client sync
+                     │                   │  • State machine (IDLE/WEB/TERMINAL)
+                     └─────────┬─────────┘  • Terminal session detection
+                               │
+                               ├─────────────┬──────────────┐
+                               │             │              │
+                     ┌─────────▼──────┐ ┌───▼────┐  ┌─────▼──────┐
+                     │ Claude Process │ │ File   │  │  Terminal  │
+                     │   (headless)   │ │Watcher │  │  Session   │
+                     └────────┬───────┘ └────────┘  └─────┬──────┘
+                              │                            │
+                              └────────────┬───────────────┘
+                                           │
+                                 ┌─────────▼─────────┐
+                                 │  ~/.claude/       │
+                                 │  projects/        │
+                                 │  {cwd}/{uuid}     │
+                                 │  .jsonl           │
+                                 │                   │
+                                 │ (Source of Truth) │
+                                 └───────────────────┘
+```
+
+**Key architectural principles:**
+- **Claude's `.jsonl` files are the source of truth** - All message history lives here
+- **sprite-mobile is a proxy** - Forwards WebSocket traffic to claude-hub
+- **claude-hub manages process lifecycle** - State machine handles web/terminal transitions
+- **Multi-client sync** - Multiple browsers and terminal sessions share the same Claude session
+- **No time-based cleanup** - Sessions persist until explicitly terminated
+
 ### Services
 
 After setup, these services run on your sprite:
@@ -530,17 +594,28 @@ After setup, these services run on your sprite:
 | Service | Port | Description |
 |---------|------|-------------|
 | `tailnet-gate` | 8080 | Public entry point, embeds Tailscale URL in iframe with WebSocket keepalive |
-| `sprite-mobile` | 8081 | Main app server (accessed via Tailscale) |
+| `sprite-mobile` | 8081 | Main app server, proxies WebSocket connections to claude-hub |
+| `claude-hub` | 9090 | WebSocket hub for multi-client Claude Code session synchronization |
 | `tailscaled` | - | Tailscale daemon |
 
 ### Data Storage
 
-All data is stored in the `data/` directory:
+**Session data (source of truth):**
+- `~/.claude/projects/{cwdDir}/{sessionId}.jsonl` - All message history in Claude's native format
+- This is the authoritative source for all conversation data
 
-- `sessions.json` - Chat session metadata
-- `sprites.json` - Saved Sprite profiles
-- `messages/{sessionId}.json` - Message history per session
+**sprite-mobile lightweight metadata** (`data/` directory):
+- `sessions.json` - UI metadata only (session names, timestamps, preview text)
+- `sprites.json` - Saved Sprite profiles for network discovery
 - `uploads/{sessionId}/` - Uploaded images per session
+
+**Architecture:**
+When `USE_GO_HUB=true` (the default), sprite-mobile acts as a WebSocket proxy to claude-hub. Messages flow:
+```
+Web Client → sprite-mobile (proxy) → claude-hub → Claude process → ~/.claude/projects/*.jsonl
+```
+
+Claude's `.jsonl` files are the source of truth. Sprite-mobile only maintains lightweight metadata for the UI (session list, previews, timestamps).
 
 ### API Endpoints
 
@@ -580,14 +655,20 @@ All data is stored in the `data/` directory:
 
 Connect to `/ws?session={sessionId}` to interact with a chat session.
 
-**Incoming messages (from server):**
+**With claude-hub (default):**
+- sprite-mobile acts as a transparent WebSocket proxy
+- Messages flow: `Web Client ↔ sprite-mobile (proxy) ↔ claude-hub ↔ Claude process`
+- Multiple clients can connect to the same session (synced in real-time)
+- Terminal sessions and web clients share the same session seamlessly
+
+**Incoming messages (from claude-hub via proxy):**
+- `{ type: "system", subtype: "init", session_id: "..." }` - Session initialized with Claude's UUID
 - `{ type: "history", messages: [...] }` - Message history on connect
 - `{ type: "assistant", message: {...} }` - Streaming assistant response
 - `{ type: "result", ... }` - Response complete
 - `{ type: "user_message", message: {...} }` - User message from another client
 - `{ type: "processing", isProcessing: true/false }` - Processing state
-- `{ type: "refresh_sessions" }` - Session list changed
-- `{ type: "system", message: "..." }` - System notifications
+- `{ type: "system", message: "..." }` - System notifications (e.g., "Switched to terminal mode")
 
 **Outgoing messages (to server):**
 ```json
@@ -599,6 +680,12 @@ Connect to `/ws?session={sessionId}` to interact with a chat session.
   "imageMediaType": "image/png"
 }
 ```
+
+**Session ID synchronization:**
+- Web clients start with a temporary UUID
+- claude-hub spawns Claude, which generates its own session UUID
+- `init` message updates the frontend to use Claude's UUID
+- URL hash, session metadata, and `.jsonl` files all sync to Claude's UUID
 
 ### Keepalive
 
@@ -612,12 +699,31 @@ Both use persistent WebSocket connections because sprites stay awake as long as 
 
 ## Session Lifecycle
 
-1. **Creation**: `POST /api/sessions` creates a new session with a working directory
-2. **Connection**: WebSocket connection spawns a Claude Code process
-3. **Messaging**: Messages are saved and streamed in real-time
-4. **Disconnection**: Claude process continues running for 30 minutes
-5. **Reconnection**: Rejoins the existing process if still alive, otherwise resumes via Claude's session ID
-6. **Cleanup**: Idle processes with no clients are terminated after 30 minutes
+**With claude-hub (default `USE_GO_HUB=true`):**
+
+1. **Creation**: Browser connects to `ws://localhost:8081/ws?session={id}`
+2. **Proxy**: sprite-mobile proxies connection to `ws://localhost:9090/ws?session={id}`
+3. **Session State Machine**: claude-hub manages session state
+   - `IDLE` → `WEB_ONLY` (first web client connects, spawns headless Claude process)
+   - `WEB_ONLY` ⇄ `TERMINAL_ONLY` (terminal session detected/exits)
+   - `WEB_ONLY`/`TERMINAL_ONLY` → `IDLE` (all clients disconnect)
+4. **Process Lifecycle**: Claude processes persist even after all clients disconnect
+   - No time-based cleanup or 30-minute timeouts
+   - Process stays alive until explicitly interrupted or sprite restarts
+   - Session files in `~/.claude/projects/` preserve full history
+5. **Reconnection**: Resuming a session rejoins the existing process with full history
+
+**⚠️ Important: Sprite Sleep Behavior**
+
+If you close your browser while Claude is working:
+- WebSocket disconnects → claude-hub keeps Claude process alive
+- **BUT** sprite goes to sleep (no HTTP connections to port 8081)
+- All processes freeze until sprite wakes up
+
+**Workarounds for long-running tasks:**
+- Keep browser tab open (even in background)
+- Open terminal session: `sprite exec -s <sprite-name>` keeps sprite awake
+- Use distributed tasks to assign work to another sprite
 
 ## CLI Session Attachment
 
@@ -642,14 +748,18 @@ Claude CLI stores sessions in `~/.claude/projects/{cwd}/{sessionId}.jsonl`. The 
 - Shows the first user message as a preview
 - Filters out empty sessions and internal tool messages
 
-**Important caveat:**
+**Important caveat (with claude-hub):**
 
-When you attach to a CLI session, Sprite Mobile spawns a **new** Claude Code process that resumes the conversation using the session ID. This means:
+claude-hub manages transitions between web and terminal sessions using a state machine:
 
-- The web interface and CLI are running separate processes
-- Any work done in the web interface is saved to the shared session history
-- If you later try to resume the same session from the CLI while the web session is still active, both processes will be writing to the same session file
-- **Best practice**: Finish your work in one interface before switching to the other to avoid potential conflicts
+- **Web-only mode**: claude-hub runs a headless Claude process
+- **Terminal detected**: claude-hub kills the headless process and monitors the terminal session
+- **Terminal exits**: claude-hub spawns headless process again
+
+**Potential race condition:**
+- During the transition window (terminal detection → killing headless), both processes could theoretically write to the same `.jsonl` file
+- claude-hub detects terminal sessions via file watching (fsnotify), not continuous polling
+- **Best practice**: Avoid actively using both terminal and web interface simultaneously on the same session to prevent potential file corruption during state transitions
 
 ## Configuration
 
