@@ -835,5 +835,130 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     })();
   }
 
+  // GET /api/keepalive/status - Check if keepalive process is running
+  if (req.method === "GET" && path === "/api/keepalive/status") {
+    return (async () => {
+      try {
+        // Check if process is running using pgrep
+        const result = spawn(["pgrep", "-f", "session-keepalive.sh"], {
+          stdout: "pipe",
+          stderr: "pipe"
+        });
+        const output = await new Response(result.stdout).text();
+        const pid = output.trim();
+
+        if (pid) {
+          return Response.json({
+            running: true,
+            pid: parseInt(pid)
+          });
+        }
+
+        return Response.json({ running: false });
+      } catch (err) {
+        console.error("Failed to check keepalive status:", err);
+        return Response.json({ running: false, error: String(err) }, { status: 500 });
+      }
+    })();
+  }
+
+  // POST /api/keepalive/start - Start the keepalive process
+  if (req.method === "POST" && path === "/api/keepalive/start") {
+    return (async () => {
+      try {
+        // Check if already running
+        const checkResult = spawn(["pgrep", "-f", "session-keepalive.sh"], {
+          stdout: "pipe",
+          stderr: "pipe"
+        });
+        const pid = (await new Response(checkResult.stdout).text()).trim();
+
+        if (pid) {
+          console.log(`[Keepalive] Already running (PID: ${pid})`);
+          return Response.json({
+            success: true,
+            message: "Keepalive already running",
+            pid: parseInt(pid)
+          });
+        }
+
+        // Start keepalive as background process
+        const scriptPath = join(process.env.HOME || "/home/sprite", ".sprite-mobile/scripts/session-keepalive.sh");
+        const logPath = join(process.env.HOME || "/home/sprite", ".sprite-mobile/data/keepalive.log");
+
+        spawn(["bash", scriptPath], {
+          stdout: "pipe",
+          stderr: "pipe",
+          stdin: "ignore",
+          env: process.env,
+          detached: true,
+          // Redirect output to log file
+          onExit: (proc, code) => {
+            console.log(`[Keepalive] Process exited with code ${code}`);
+          }
+        });
+
+        // Wait a moment for process to start
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verify it started
+        const verifyResult = spawn(["pgrep", "-f", "session-keepalive.sh"], {
+          stdout: "pipe",
+          stderr: "pipe"
+        });
+        const newPid = (await new Response(verifyResult.stdout).text()).trim();
+
+        if (newPid) {
+          console.log(`[Keepalive] Started successfully (PID: ${newPid})`);
+          return Response.json({ success: true, message: "Keepalive started", pid: parseInt(newPid) });
+        } else {
+          console.error("[Keepalive] Failed to start (process not found after spawn)");
+          return Response.json({ success: false, error: "Failed to start keepalive process" }, { status: 500 });
+        }
+      } catch (err) {
+        console.error("[Keepalive] Error starting:", err);
+        return Response.json({ success: false, error: String(err) }, { status: 500 });
+      }
+    })();
+  }
+
+  // POST /api/keepalive/stop - Stop the keepalive process
+  if (req.method === "POST" && path === "/api/keepalive/stop") {
+    return (async () => {
+      try {
+        // Find the process
+        const checkResult = spawn(["pgrep", "-f", "session-keepalive.sh"], {
+          stdout: "pipe",
+          stderr: "pipe"
+        });
+        const pid = (await new Response(checkResult.stdout).text()).trim();
+
+        if (!pid) {
+          return Response.json({ success: true, message: "Keepalive not running" });
+        }
+
+        // Kill the process
+        const killResult = spawn(["kill", pid], {
+          stdout: "pipe",
+          stderr: "pipe"
+        });
+
+        await killResult.exited;
+
+        if (killResult.exitCode === 0) {
+          console.log(`[Keepalive] Stopped process (PID: ${pid})`);
+          return Response.json({ success: true, message: "Keepalive stopped" });
+        } else {
+          const error = await new Response(killResult.stderr).text();
+          console.error("[Keepalive] Failed to stop:", error);
+          return Response.json({ success: false, error }, { status: 500 });
+        }
+      } catch (err) {
+        console.error("[Keepalive] Error stopping:", err);
+        return Response.json({ success: false, error: String(err) }, { status: 500 });
+      }
+    })();
+  }
+
   return null;
 }

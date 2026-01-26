@@ -13,6 +13,20 @@ export const allClients = new Set<any>();
 // Track hub WebSocket connections per client
 const hubConnections = new Map<any, WebSocket>();
 
+// Start keepalive session to keep sprite awake during generation
+async function startKeepalive() {
+  try {
+    const response = await fetch('http://localhost:8081/api/keepalive/start', {
+      method: 'POST',
+    });
+    if (response.ok) {
+      console.log('[Keepalive] Started successfully');
+    }
+  } catch (err) {
+    console.error('[Keepalive] Failed to start:', err);
+  }
+}
+
 // Proxy WebSocket connection to Go hub
 function proxyToGoHub(clientWs: any, sessionId: string) {
   const hubUrl = `${GO_HUB_URL}/ws?session=${sessionId}`;
@@ -163,6 +177,14 @@ export const websocketHandlers = {
     if (USE_GO_HUB) {
       const hubWs = hubConnections.get(ws);
       if (hubWs && hubWs.readyState === 1) {
+        // Start keepalive when user sends a message (keeps sprite awake during generation)
+        try {
+          const data = JSON.parse(message.toString());
+          if (data.type === "user") {
+            startKeepalive().catch(() => {}); // Fire and forget
+          }
+        } catch {}
+
         hubWs.send(message.toString());
       }
       return;
