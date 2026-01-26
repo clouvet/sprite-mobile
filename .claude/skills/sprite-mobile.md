@@ -4,28 +4,59 @@ Use this skill when working with sprite-mobile - a Progressive Web App chat UI f
 
 ## Architecture Overview
 
-### Two-Service Design
+### Three-Service Design
 
-sprite-mobile uses a **dual-service architecture** for secure access:
+sprite-mobile uses a **multi-service architecture** for multi-client Claude Code session management:
 
 ```
-Public URL (https://sprite.fly.dev)
-         │
-         ▼
-   tailnet-gate (port 8080)
-         │
-         ├── Embeds iframe with Tailscale HTTPS URL
-         │   │
-         │   ├── On tailnet? ──→ Shows sprite-mobile interface
-         │   │                   (WebSocket keeps sprite awake)
-         │   │
-         │   └── Not on tailnet (4s timeout)? ──→ Shows "Unauthorized" 👾 🚫
-         │
-         └── Hash syncing ──→ Deep linking to specific chat sessions
-
-   sprite-mobile (port 8081)
-         │
-         └── Accessed via Tailscale HTTPS (https://hostname.ts.net)
+┌─────────────────────────────────────────────────────────────────┐
+│                         Public Internet                          │
+│                  https://my-sprite.sprites.app                   │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                     ┌─────────▼─────────┐
+                     │  tailnet-gate     │  Port 8080
+                     │  (Public entry)   │  • Wakes sprite
+                     │                   │  • Embeds Tailscale URL in iframe
+                     └─────────┬─────────┘  • WebSocket keepalive
+                               │
+                     ┌─────────▼─────────┐
+                     │  Tailscale HTTPS  │
+                     │  my-sprite.ts.net │
+                     └─────────┬─────────┘
+                               │
+                     ┌─────────▼─────────┐
+                     │  sprite-mobile    │  Port 8081
+                     │  (Web UI + API)   │  • Serves PWA interface
+                     │                   │  • Proxies WebSocket to claude-hub
+                     └─────────┬─────────┘  • Maintains UI metadata
+                               │
+                               │ WebSocket Proxy (USE_GO_HUB=true)
+                               │
+                     ┌─────────▼─────────┐
+                     │   claude-hub      │  Port 9090
+                     │  (Session Mgr)    │  • Spawns/manages Claude processes
+                     │                   │  • Multi-client sync
+                     │                   │  • State machine (IDLE/WEB/TERMINAL)
+                     └─────────┬─────────┘  • Terminal session detection
+                               │
+                               ├─────────────┬──────────────┐
+                               │             │              │
+                     ┌─────────▼──────┐ ┌───▼────┐  ┌─────▼──────┐
+                     │ Claude Process │ │ File   │  │  Terminal  │
+                     │   (headless)   │ │Watcher │  │  Session   │
+                     └────────┬───────┘ └────────┘  └─────┬──────┘
+                              │                            │
+                              └────────────┬───────────────┘
+                                           │
+                                 ┌─────────▼─────────┐
+                                 │  ~/.claude/       │
+                                 │  projects/        │
+                                 │  {cwd}/{uuid}     │
+                                 │  .jsonl           │
+                                 │                   │
+                                 │ (Source of Truth) │
+                                 └───────────────────┘
 ```
 
 **Key Services:**
@@ -34,12 +65,24 @@ Public URL (https://sprite.fly.dev)
   - Generated by: `sprite-setup.sh` (step 10)
   - Purpose: Wake sprite, provide keepalive, show unauthorized page if not on tailnet
 
-- `sprite-mobile` (port 8081): Main app server, Claude Code chat interface
+- `sprite-mobile` (port 8081): Web UI and API server
   - Location: `~/.sprite-mobile/`
   - Started via: `~/.sprite-mobile/scripts/start-service.sh` (sources `~/.sprite-config`)
-  - Purpose: WebSocket-based chat interface with Claude Code in YOLO mode
+  - Purpose: PWA interface, WebSocket proxy to claude-hub, lightweight UI metadata
+
+- `claude-hub` (port 9090): WebSocket hub for multi-client session synchronization
+  - Location: `~/.claude-hub/`
+  - Purpose: Spawn/manage Claude processes, handle web/terminal state transitions, sync messages
+  - State machine: `IDLE → WEB_ONLY ⇄ TERMINAL_ONLY`
 
 - `tailscaled`: Tailscale daemon for secure network access
+
+**Key architectural principles:**
+- **Claude's `.jsonl` files are the source of truth** - All message history in `~/.claude/projects/`
+- **sprite-mobile is a proxy** - Forwards WebSocket traffic to claude-hub when `USE_GO_HUB=true` (default)
+- **claude-hub manages process lifecycle** - State machine handles web/terminal transitions
+- **Multi-client sync** - Multiple browsers and terminal sessions share the same Claude session
+- **No time-based cleanup** - Sessions persist until explicitly terminated
 
 ### Access Model
 
@@ -55,11 +98,56 @@ Public URL (https://sprite.fly.dev)
 
 ### Data Storage
 
-All data stored in `~/.sprite-mobile/data/`:
-- `sessions.json` - Chat session metadata
-- `sprites.json` - Saved Sprite profiles
-- `messages/{sessionId}.json` - Message history per session
+**Session data (source of truth):**
+- `~/.claude/projects/{cwdDir}/{sessionId}.jsonl` - All message history in Claude's native format
+- This is the authoritative source for all conversation data
+- Shared between web clients and terminal sessions
+
+**sprite-mobile lightweight metadata** (`~/.sprite-mobile/data/`):
+- `sessions.json` - UI metadata only (session names, timestamps, preview text)
+- `sprites.json` - Saved Sprite profiles for network discovery
 - `uploads/{sessionId}/` - Uploaded images per session
+
+**With USE_GO_HUB=true (default):**
+- sprite-mobile acts as WebSocket proxy to claude-hub
+- Message flow: `Web Client → sprite-mobile → claude-hub → Claude → ~/.claude/projects/*.jsonl`
+- sprite-mobile does NOT store message history when proxying
+- Session metadata auto-created when first message sent
+
+### Session Lifecycle
+
+**With claude-hub (default `USE_GO_HUB=true`):**
+
+1. **Creation**: Browser connects to `ws://localhost:8081/ws?session={id}`
+2. **Proxy**: sprite-mobile proxies connection to `ws://localhost:9090/ws?session={id}`
+3. **Session State Machine**: claude-hub manages session state
+   - `IDLE` → `WEB_ONLY` (first web client connects, spawns headless Claude process)
+   - `WEB_ONLY` ⇄ `TERMINAL_ONLY` (terminal session detected/exits)
+   - `WEB_ONLY`/`TERMINAL_ONLY` → `IDLE` (all clients disconnect)
+4. **Process Lifecycle**: Claude processes persist even after all clients disconnect
+   - No time-based cleanup or 30-minute timeouts
+   - Process stays alive until explicitly interrupted or sprite restarts
+   - Session files in `~/.claude/projects/` preserve full history
+5. **Reconnection**: Resuming a session rejoins the existing process with full history
+
+**⚠️ CRITICAL: Sprite Sleep Behavior**
+
+If you close your browser while Claude is working:
+- WebSocket disconnects → claude-hub keeps Claude process alive
+- **BUT** sprite goes to sleep (no HTTP connections to port 8081)
+- **All processes freeze until sprite wakes up**
+
+**Workarounds for long-running tasks:**
+- Keep browser tab open (even in background)
+- Open terminal session: `sprite exec -s <sprite-name>` keeps sprite awake
+- Use distributed tasks to assign work to another sprite
+- When assigning tasks, mention: "This may take a while - keeping connection open"
+
+**This is important when:**
+- Running tests that take several minutes
+- Building/compiling large projects
+- Processing large files or datasets
+- Generating extensive code changes
 
 ## Service Management
 
@@ -69,8 +157,9 @@ All data stored in `~/.sprite-mobile/data/`:
 # List all services
 sprite-env services list
 
-# View logs for a specific service
+# View logs for specific services
 sprite-env services logs sprite-mobile
+sprite-env services logs claude-hub
 sprite-env services logs tailnet-gate
 sprite-env services logs tailscaled
 ```
@@ -84,6 +173,10 @@ sprite-env services logs tailscaled
 sprite-env services stop sprite-mobile
 sprite-env services start sprite-mobile
 
+# Restart claude-hub
+sprite-env services stop claude-hub
+sprite-env services start claude-hub
+
 # Restart tailnet-gate
 sprite-env services stop tailnet-gate
 sprite-env services start tailnet-gate
@@ -91,6 +184,7 @@ sprite-env services start tailnet-gate
 
 The `start-service.sh` wrapper automatically:
 - Sources `~/.sprite-config` for environment variables
+- Sets `USE_GO_HUB=true` (enables claude-hub proxy mode)
 - Runs `git pull` to auto-update
 - Installs dependencies via `bun install`
 - Starts the server with `bun run server.ts`
@@ -541,12 +635,20 @@ This regenerates the tailnet-gate server with the current Tailscale serve URL.
 
 Connect to `/ws?session={sessionId}` for real-time chat.
 
-**From server:**
+**With claude-hub (default):**
+- sprite-mobile acts as a transparent WebSocket proxy
+- Messages flow: `Web Client ↔ sprite-mobile (proxy) ↔ claude-hub ↔ Claude process`
+- Multiple clients can connect to the same session (synced in real-time)
+- Terminal sessions and web clients share the same session seamlessly
+
+**From server (via claude-hub):**
+- `{ type: "system", subtype: "init", session_id: "..." }` - Session initialized with Claude's UUID
 - `{ type: "history", messages: [...] }` - Initial message history
 - `{ type: "assistant", message: {...} }` - Streaming response
 - `{ type: "result", ... }` - Response complete
+- `{ type: "user_message", message: {...} }` - User message from another client
 - `{ type: "processing", isProcessing: true/false }` - Processing state
-- `{ type: "refresh_sessions" }` - Session list changed
+- `{ type: "system", message: "..." }` - System notifications (e.g., "Switched to terminal mode")
 
 **To server:**
 ```json
@@ -558,6 +660,12 @@ Connect to `/ws?session={sessionId}` for real-time chat.
   "imageMediaType": "image/png"
 }
 ```
+
+**Session ID synchronization:**
+- Web clients start with a temporary UUID
+- claude-hub spawns Claude, which generates its own session UUID
+- `init` message updates the frontend to use Claude's UUID
+- URL hash, session metadata, and `.jsonl` files all sync to Claude's UUID
 
 ## Distributed Tasks
 
