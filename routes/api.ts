@@ -288,45 +288,51 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
       const session = getSession(id);
       if (!session) return new Response("Not found", { status: 404 });
 
-      let messages = loadMessages(id);
+      // Read messages directly from Claude's .jsonl session file
+      const claudeSessionFile = join(CLAUDE_PROJECTS_DIR, `${id}.jsonl`);
+      let messages: Array<{ role: string; content: string }> = [];
 
-      // If no messages in sprite-mobile's data, try reading from Claude's .jsonl file
-      if (messages.length === 0) {
-        const claudeSessionFile = join(CLAUDE_PROJECTS_DIR, `${id}.jsonl`);
-        if (existsSync(claudeSessionFile)) {
-          try {
-            const content = readFileSync(claudeSessionFile, "utf-8");
-            const lines = content.trim().split("\n").filter(line => line.trim());
+      if (!existsSync(claudeSessionFile)) {
+        return new Response("No Claude session file found", { status: 404 });
+      }
 
-            // Parse Claude's stream-json format
-            messages = lines
-              .map(line => {
-                try {
-                  const msg = JSON.parse(line);
-                  if (msg.type === "input_json" && msg.input_json) {
-                    // User message
-                    const userMsg = JSON.parse(msg.input_json);
-                    if (userMsg.messages && userMsg.messages.length > 0) {
-                      return { role: "user", content: userMsg.messages[0].content };
-                    }
-                  } else if (msg.type === "message" && msg.message) {
-                    // Assistant message
-                    const content = msg.message.content
-                      ?.filter((c: any) => c.type === "text")
-                      .map((c: any) => c.text)
-                      .join("\n") || "";
-                    if (content) {
-                      return { role: "assistant", content };
-                    }
-                  }
-                } catch {}
-                return null;
-              })
-              .filter((msg): msg is { role: string; content: string } => msg !== null);
-          } catch (err) {
-            console.error("Failed to read Claude session file:", err);
-          }
-        }
+      try {
+        const content = readFileSync(claudeSessionFile, "utf-8");
+        const lines = content.trim().split("\n").filter(line => line.trim());
+
+        // Parse Claude's stream-json format
+        messages = lines
+          .map(line => {
+            try {
+              const msg = JSON.parse(line);
+              if (msg.type === "input_json" && msg.input_json) {
+                // User message
+                const userMsg = JSON.parse(msg.input_json);
+                if (userMsg.messages && userMsg.messages.length > 0) {
+                  const content = userMsg.messages[0].content;
+                  // Handle both string and array content
+                  const textContent = Array.isArray(content)
+                    ? content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ")
+                    : content;
+                  return { role: "user", content: textContent };
+                }
+              } else if (msg.type === "message" && msg.message) {
+                // Assistant message
+                const content = msg.message.content
+                  ?.filter((c: any) => c.type === "text")
+                  .map((c: any) => c.text)
+                  .join("\n") || "";
+                if (content) {
+                  return { role: "assistant", content };
+                }
+              }
+            } catch {}
+            return null;
+          })
+          .filter((msg): msg is { role: string; content: string } => msg !== null);
+      } catch (err) {
+        console.error("Failed to read Claude session file:", err);
+        return new Response("Failed to read session file", { status: 500 });
       }
 
       if (messages.length === 0) {
