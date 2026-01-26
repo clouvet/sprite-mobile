@@ -10,13 +10,13 @@ sprite-mobile gives you a progressive web app chat UI for accessing Claude Code 
 
 ## Table of Contents
 
+- [Sprite Setup](#sprite-setup)
+- [Sprite Orchestration](#sprite-orchestration)
 - [Prerequisites](#prerequisites)
 - [Claude Code Integration](#claude-code-integration)
 - [Features](#features)
 - [Distributed Tasks](#distributed-tasks)
 - [Access Model](#access-model)
-- [Sprite Setup](#sprite-setup)
-- [Sprite Orchestration](#sprite-orchestration)
 - [Quick Start](#quick-start)
 - [Environment Variables](#environment-variables)
 - [Architecture](#architecture)
