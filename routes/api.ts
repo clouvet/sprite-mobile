@@ -289,7 +289,9 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
       if (!session) return new Response("Not found", { status: 404 });
 
       // Read messages directly from Claude's .jsonl session file
-      const claudeSessionFile = join(CLAUDE_PROJECTS_DIR, `${id}.jsonl`);
+      // Convert cwd to directory name format (e.g., "/home/sprite" -> "-home-sprite")
+      const cwdDir = (session.cwd || "/home/sprite").replace(/\//g, "-");
+      const claudeSessionFile = join(CLAUDE_PROJECTS_DIR, cwdDir, `${id}.jsonl`);
       let messages: Array<{ role: string; content: string }> = [];
 
       if (!existsSync(claudeSessionFile)) {
