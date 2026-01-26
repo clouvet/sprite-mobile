@@ -288,7 +288,47 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
       const session = getSession(id);
       if (!session) return new Response("Not found", { status: 404 });
 
-      const messages = loadMessages(id);
+      let messages = loadMessages(id);
+
+      // If no messages in sprite-mobile's data, try reading from Claude's .jsonl file
+      if (messages.length === 0) {
+        const claudeSessionFile = join(CLAUDE_PROJECTS_DIR, `${id}.jsonl`);
+        if (existsSync(claudeSessionFile)) {
+          try {
+            const content = readFileSync(claudeSessionFile, "utf-8");
+            const lines = content.trim().split("\n").filter(line => line.trim());
+
+            // Parse Claude's stream-json format
+            messages = lines
+              .map(line => {
+                try {
+                  const msg = JSON.parse(line);
+                  if (msg.type === "input_json" && msg.input_json) {
+                    // User message
+                    const userMsg = JSON.parse(msg.input_json);
+                    if (userMsg.messages && userMsg.messages.length > 0) {
+                      return { role: "user", content: userMsg.messages[0].content };
+                    }
+                  } else if (msg.type === "message" && msg.message) {
+                    // Assistant message
+                    const content = msg.message.content
+                      ?.filter((c: any) => c.type === "text")
+                      .map((c: any) => c.text)
+                      .join("\n") || "";
+                    if (content) {
+                      return { role: "assistant", content };
+                    }
+                  }
+                } catch {}
+                return null;
+              })
+              .filter((msg): msg is { role: string; content: string } => msg !== null);
+          } catch (err) {
+            console.error("Failed to read Claude session file:", err);
+          }
+        }
+      }
+
       if (messages.length === 0) {
         return new Response("No messages to generate title from", { status: 400 });
       }
@@ -373,6 +413,33 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
       }
 
       return Response.json({ success: true, oldId, newId });
+    })();
+  }
+
+  // POST /api/sessions/:id/update-message
+  if (req.method === "POST" && path.match(/^\/api\/sessions\/[^/]+\/update-message$/)) {
+    return (async () => {
+      const id = path.split("/")[3];
+      const body = await req.json() as { role: 'user' | 'assistant'; content: string };
+      const { role, content } = body;
+
+      if (!role || !content) {
+        return new Response("Missing role or content", { status: 400 });
+      }
+
+      const session = getSession(id);
+      if (!session) {
+        return new Response("Session not found", { status: 404 });
+      }
+
+      // Update session metadata
+      const preview = content.slice(0, 100);
+      updateSession(id, {
+        lastMessage: preview,
+        lastMessageAt: Date.now()
+      });
+
+      return Response.json({ success: true });
     })();
   }
 

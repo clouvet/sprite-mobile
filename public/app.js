@@ -853,6 +853,18 @@
         const contentEl = currentAssistantMessage.querySelector('.message-content');
         contentEl.classList.remove('streaming');
         contentEl.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+
+        // Update session metadata in backend with assistant's response
+        if (currentSession && assistantContent) {
+          fetch(`/api/sessions/${currentSession.id}/update-message`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'assistant', content: assistantContent })
+          })
+            .then(() => loadSessions()) // Refresh sessions list to show new preview
+            .catch(err => console.error('Failed to update session:', err));
+        }
+
         currentAssistantMessage = null;
         assistantContent = '';
         // Track for auto title regeneration
@@ -1025,6 +1037,15 @@
       addUserMessage(text, hasImage ? pendingImage.localUrl : null);
       ws.send(JSON.stringify(payload));
       showThinkingIndicator();
+
+      // Update session metadata in backend
+      if (currentSession) {
+        fetch(`/api/sessions/${currentSession.id}/update-message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'user', content: text || '[Image]' })
+        }).catch(err => console.error('Failed to update session:', err));
+      }
 
       // Clear input and image
       inputEl.value = '';
