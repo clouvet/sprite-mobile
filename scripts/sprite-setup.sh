@@ -1446,7 +1446,7 @@ const html = \`<!DOCTYPE html>
         iframe.style.display = 'none';
         unauthorized.classList.add('visible');
       }
-    }, 8000); // 8 second timeout
+    }, 12000); // 12 second timeout
 
     // Update iframe when outer hash changes
     window.addEventListener('hashchange', () => {
@@ -1840,11 +1840,11 @@ run_all_steps() {
     step_5_flyctl
     step_7_tailscale
     step_9_tailscale_serve
+    step_12_claude_hub
     step_8_sprite_mobile
     step_6_5_network
     step_10_tailnet_gate
     step_11_claude_md
-    step_12_claude_hub
 
     # Final restart of sprite-mobile to pick up all environment changes
     echo ""
