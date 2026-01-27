@@ -57,7 +57,6 @@
     const sendBtn = document.getElementById('send');
     const statusEl = document.getElementById('status');
     const settingsBtn = document.getElementById('settings-btn');
-    const regenerateTitleBtn = document.getElementById('regenerate-title-btn');
     const stopBtn = document.getElementById('stop-btn');
     const attachBtn = document.getElementById('attach-btn');
     const fileInput = document.getElementById('file-input');
@@ -192,17 +191,13 @@
 
     // Update displayed sprite name
     function updateSpriteName(name) {
-      spriteName = name || 'Sprite MObile';
-      const emojiHtml = '<span class="sprite-emoji">👾</span>';
-      const displayHtml = `${escapeHtml(spriteName)} ${emojiHtml}`;
-      // Update header title if showing empty state
-      if (emptyState.style.display !== 'none') {
-        chatTitle.innerHTML = displayHtml;
-      }
-      // Update welcome message
+      spriteName = name || 'Sprite Mobile';
+      // Clear header title
+      chatTitle.textContent = '';
+      // Update welcome message with sprite name
       const welcomeH2 = emptyState.querySelector('h2');
       if (welcomeH2) {
-        welcomeH2.innerHTML = `Welcome to ${displayHtml}`;
+        welcomeH2.textContent = `Welcome to ${spriteName}`;
       }
       // Update page title
       document.title = spriteName;
@@ -496,7 +491,6 @@
       messagesEl.innerHTML = '';
       renderSessionsList();
       connectWs(session.id);
-      regenerateTitleBtn.classList.add('visible');
       messageCountSinceLastTitleUpdate = 0;
       // Update URL hash to persist session across refreshes
       history.replaceState(null, '', `#session=${session.id}`);
@@ -513,7 +507,6 @@
       inputArea.classList.remove('active');
       statusEl.textContent = 'Disconnected';
       statusEl.className = '';
-      regenerateTitleBtn.classList.remove('visible');
       // Clear URL hash when no session selected
       history.replaceState(null, '', location.pathname);
       // Manually notify parent since history.replaceState doesn't trigger hashchange
@@ -1224,7 +1217,6 @@
     async function regenerateTitle() {
       if (!currentSession) return;
       console.log('[regenerateTitle] Using session ID:', currentSession.id);
-      regenerateTitleBtn.classList.add('spinning');
 
       try {
         const res = await fetch(`/api/sessions/${currentSession.id}/regenerate-title`, {
@@ -1246,8 +1238,6 @@
         }
       } catch (err) {
         console.error('Failed to regenerate title:', err);
-      } finally {
-        regenerateTitleBtn.classList.remove('spinning');
       }
     }
 
@@ -1264,8 +1254,6 @@
         startEditingTitle();
       }
     });
-
-    regenerateTitleBtn.addEventListener('click', regenerateTitle);
 
     // Event listeners
     inputEl.addEventListener('input', () => {

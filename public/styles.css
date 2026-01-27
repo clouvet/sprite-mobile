@@ -316,34 +316,6 @@
       padding: 0;
     }
 
-    #regenerate-title-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      font-size: 14px;
-      cursor: pointer;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-right: 4px;
-    }
-
-    #regenerate-title-btn.visible {
-      display: flex;
-    }
-
-    #regenerate-title-btn:active {
-      background: var(--bg-tertiary);
-    }
-
-    #regenerate-title-btn.spinning svg {
-      animation: spin 1s linear infinite;
-    }
-
     #stop-btn {
       width: 32px;
       height: 32px;
@@ -390,19 +362,17 @@
     }
 
     #status::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #666;
+      content: "👾";
+      font-size: 14px;
+      filter: grayscale(100%) brightness(0.8);
     }
 
     #status.connected::before {
-      background: #4ade80;
+      filter: sepia(100%) saturate(500%) hue-rotate(60deg) brightness(0.9);
     }
 
     #status.error::before {
-      background: #f87171;
+      filter: sepia(100%) saturate(500%) hue-rotate(-20deg) brightness(1.1);
     }
 
     /* Empty state */
@@ -1300,23 +1270,25 @@
     }
 
     .sprite-status {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
       flex-shrink: 0;
+      font-size: 14px;
+      line-height: 1;
     }
 
-    .sprite-status.online {
-      background: #22c55e;
-      box-shadow: 0 0 6px #22c55e;
+    .sprite-status::before {
+      content: "👾";
     }
 
-    .sprite-status.recent {
-      background: #eab308;
+    .sprite-status.online::before {
+      filter: sepia(100%) saturate(500%) hue-rotate(60deg) brightness(0.9);
     }
 
-    .sprite-status.offline {
-      background: #6b7280;
+    .sprite-status.recent::before {
+      filter: sepia(100%) saturate(500%) hue-rotate(10deg) brightness(1.1);
+    }
+
+    .sprite-status.offline::before {
+      filter: grayscale(100%) brightness(0.6);
     }
 
     .sprite-owner {
