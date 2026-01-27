@@ -1565,6 +1565,7 @@
     const tasksModal = document.getElementById('tasks-modal');
     const closeTasksModal = document.getElementById('close-tasks-modal');
     const refreshTasksBtn = document.getElementById('refresh-tasks-btn');
+    const clearHistoryBtn = document.getElementById('clear-history-btn');
     const myTasksList = document.getElementById('my-tasks-list');
     const allTasksStatus = document.getElementById('all-tasks-status');
     const allTasksList = document.getElementById('all-tasks-list');
@@ -1768,12 +1769,34 @@
       }
     });
 
+    async function clearTaskHistory() {
+      if (!confirm('Clear all completed and failed tasks from history? This cannot be undone.')) {
+        return;
+      }
+
+      try {
+        clearHistoryBtn.disabled = true;
+        clearHistoryBtn.textContent = 'Clearing...';
+        const res = await fetch('/api/distributed-tasks/history', { method: 'DELETE' });
+        const data = await res.json();
+        alert(`Cleared ${data.deletedCount} tasks from history`);
+        loadTasks(); // Refresh the list
+      } catch (err) {
+        console.error('Failed to clear history:', err);
+        alert('Failed to clear history');
+      } finally {
+        clearHistoryBtn.disabled = false;
+        clearHistoryBtn.textContent = 'Clear History';
+      }
+    }
+
     tasksBtn.addEventListener('click', openTasksModal);
     closeTasksModal.addEventListener('click', closeTasksModalFn);
     tasksModal.addEventListener('click', (e) => {
       if (e.target === tasksModal) closeTasksModalFn();
     });
     refreshTasksBtn.addEventListener('click', loadTasks);
+    clearHistoryBtn.addEventListener('click', clearTaskHistory);
 
     let pullStartY = 0;
     let isPulling = false;

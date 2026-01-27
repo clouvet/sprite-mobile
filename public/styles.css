@@ -1033,6 +1033,23 @@
       font-weight: 600;
     }
 
+    .clear-history-btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+      margin-left: auto;
+      margin-right: 8px;
+    }
+
+    .clear-history-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
     .modal-close {
       width: 32px;
       height: 32px;
