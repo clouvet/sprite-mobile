@@ -78,10 +78,6 @@
     const spritesSeparator = document.getElementById('sprites-separator');
     const wakingOverlay = document.getElementById('waking-overlay');
     const switchingOverlay = document.getElementById('switching-overlay');
-    const attachSessionBtn = document.getElementById('attach-session-btn');
-    const externalSessionsModal = document.getElementById('external-sessions-modal');
-    const closeExternalSessionsModal = document.getElementById('close-external-sessions-modal');
-    const externalSessionsList = document.getElementById('external-sessions-list');
 
     // State
     let sessions = [];
@@ -1784,87 +1780,6 @@
     });
     refreshTasksBtn.addEventListener('click', loadTasks);
 
-    // External sessions modal (attach to CLI sessions)
-    function openExternalSessionsModal() {
-      externalSessionsModal.classList.add('open');
-      loadExternalSessions();
-    }
-
-    function closeExternalSessionsModalFn() {
-      externalSessionsModal.classList.remove('open');
-    }
-
-    async function loadExternalSessions() {
-      externalSessionsList.innerHTML = '<div class="loading">Loading sessions...</div>';
-
-      try {
-        const res = await fetch('/api/claude-sessions');
-        const cliSessions = await res.json();
-
-        if (cliSessions.length === 0) {
-          externalSessionsList.innerHTML = '<div class="empty">No CLI sessions found</div>';
-          return;
-        }
-
-        externalSessionsList.innerHTML = cliSessions.map(s => `
-          <div class="external-session-item" data-session-id="${escapeHtml(s.sessionId)}" data-cwd="${escapeHtml(s.cwd)}">
-            <div class="session-preview">${escapeHtml(s.preview || 'No preview available')}</div>
-            <div class="session-cwd">${escapeHtml(s.cwd)}</div>
-            <div class="session-meta">
-              <span>${formatTime(s.lastModified)}</span>
-              <span>${formatSize(s.size)}</span>
-            </div>
-            <div class="session-id">${escapeHtml(s.sessionId)}</div>
-          </div>
-        `).join('');
-
-        // Add click handlers
-        externalSessionsList.querySelectorAll('.external-session-item').forEach(el => {
-          el.addEventListener('click', () => {
-            const sessionId = el.dataset.sessionId;
-            const cwd = el.dataset.cwd;
-            attachToExternalSession(sessionId, cwd);
-          });
-        });
-      } catch (err) {
-        console.error('Failed to load external sessions:', err);
-        externalSessionsList.innerHTML = '<div class="empty">Failed to load sessions</div>';
-      }
-    }
-
-    function formatSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-
-    async function attachToExternalSession(claudeSessionId, cwd) {
-      closeExternalSessionsModalFn();
-      closeSidebar();
-
-      // Create a new session that attaches to the external Claude session
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'CLI Session',
-          cwd: cwd,
-          claudeSessionId: claudeSessionId,
-        }),
-      });
-      const session = await res.json();
-      sessions.unshift(session);
-      renderSessionsList();
-      selectSession(session);
-    }
-
-    // External sessions modal event listeners
-    attachSessionBtn.addEventListener('click', openExternalSessionsModal);
-    closeExternalSessionsModal.addEventListener('click', closeExternalSessionsModalFn);
-    externalSessionsModal.addEventListener('click', (e) => {
-      if (e.target === externalSessionsModal) closeExternalSessionsModalFn();
-    });
-
     let pullStartY = 0;
     let isPulling = false;
     let pullDistance = 0;
@@ -1876,7 +1791,6 @@
       // Only allow pull refresh when sidebar/modal are closed
       if (sidebar.classList.contains('open')) return false;
       if (spritesModal.classList.contains('open')) return false;
-      if (externalSessionsModal.classList.contains('open')) return false;
 
       // If started on header, always allow
       if (fromHeader || pullStartedOnHeader) return true;
