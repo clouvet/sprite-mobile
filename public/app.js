@@ -1282,11 +1282,15 @@
     });
 
     inputEl.addEventListener('blur', () => {
-      // Only remove focused class if input is empty
-      // Keep it focused if there's text or an image
-      if (!inputEl.value.trim() && !pendingImage) {
-        inputArea.classList.remove('focused');
-      }
+      // Small delay to allow button clicks to process first
+      // This prevents buttons from becoming non-functional when input blurs
+      setTimeout(() => {
+        // Only remove focused class if input is empty
+        // Keep it focused if there's text or an image
+        if (!inputEl.value.trim() && !pendingImage) {
+          inputArea.classList.remove('focused');
+        }
+      }, 100);
     });
 
     sendBtn.addEventListener('click', send);
