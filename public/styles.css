@@ -333,13 +333,18 @@
       border: none;
       color: #ffffff;
       cursor: pointer;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       transition: all 0.15s;
       opacity: 1;
       margin-bottom: 3px;
+    }
+
+    /* Show stop button when input is focused */
+    #input-area.focused #stop-btn {
+      display: flex;
     }
 
     #stop-btn svg {
@@ -681,8 +686,7 @@
     }
 
     #input {
-      flex: 1 1 100%;
-      order: -1;
+      flex: 1;
       min-height: 44px;
       max-height: 120px;
       padding: 10px 14px;
@@ -696,6 +700,12 @@
       resize: none;
       outline: none;
       -webkit-appearance: none;
+    }
+
+    /* When focused, input takes full width and forces wrap */
+    #input-area.focused #input {
+      flex: 1 1 100%;
+      order: -1;
     }
 
     #input:focus { border-color: var(--accent); }
@@ -751,7 +761,7 @@
     }
     #attach-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Mic button */
+    /* Mic button - always visible */
     #mic-btn {
       width: 44px;
       height: 44px;
@@ -760,15 +770,12 @@
       border: 1px solid var(--border);
       color: var(--text-secondary);
       cursor: pointer;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
       transition: background 0.15s, border-color 0.15s, color 0.15s;
-    }
-    #input-area.focused #mic-btn {
-      display: flex;
     }
     #mic-btn:active {
       background: var(--bg-tertiary);
@@ -780,7 +787,6 @@
       border-color: #ef4444;
       color: #ef4444;
       animation: pulse-recording 1.5s ease-in-out infinite;
-      display: flex;
     }
     #mic-btn.unsupported { display: none; }
 
