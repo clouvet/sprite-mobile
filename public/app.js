@@ -92,6 +92,7 @@
     let pendingImage = null; // { id, filename, mediaType, url, localUrl }
     let isEditingTitle = false;
     let messageCountSinceLastTitleUpdate = 0;
+    let isOpeningFilePicker = false; // Track when file picker is opening
 
     // Detect if we're on a desktop device (has precise pointer like mouse/trackpad)
     function isDesktop() {
@@ -1285,6 +1286,9 @@
       // Small delay to allow button clicks to process first
       // This prevents buttons from becoming non-functional when input blurs
       setTimeout(() => {
+        // Don't collapse if file picker is opening
+        if (isOpeningFilePicker) return;
+
         // Only remove focused class if input is empty
         // Keep it focused if there's text or an image
         if (!inputEl.value.trim() && !pendingImage) {
@@ -1299,8 +1303,16 @@
     startChatBtn.addEventListener('click', () => createSession());
 
     // Image upload handlers
-    attachBtn.addEventListener('click', () => fileInput.click());
+    attachBtn.addEventListener('click', () => {
+      isOpeningFilePicker = true;
+      fileInput.click();
+      // Clear flag after a short delay (file picker has opened or was blocked)
+      setTimeout(() => {
+        isOpeningFilePicker = false;
+      }, 300);
+    });
     fileInput.addEventListener('change', (e) => {
+      isOpeningFilePicker = false; // Clear flag when file is selected
       const file = e.target.files?.[0];
       if (file) {
         uploadImage(file);
