@@ -178,9 +178,23 @@
       padding: 32px 16px;
     }
 
-    .sessions-loading .sprite-emoji {
-      font-size: 32px;
+    .sessions-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .sessions-spinner .spinner-sprite {
+      font-size: 20px;
       animation: spin-clockwise 2s linear infinite;
+      position: absolute;
     }
 
     @keyframes spin-clockwise {
