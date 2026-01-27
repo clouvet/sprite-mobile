@@ -192,6 +192,13 @@
     // Update displayed sprite name
     function updateSpriteName(name) {
       spriteName = name || 'Sprite Mobile';
+      // Clear header title
+      chatTitle.textContent = '';
+      // Update welcome message with sprite name
+      const welcomeH2 = emptyState.querySelector('h2');
+      if (welcomeH2) {
+        welcomeH2.textContent = `Welcome to ${spriteName}`;
+      }
       // Update page title
       document.title = spriteName;
     }

@@ -364,15 +364,15 @@
     #status::before {
       content: "👾";
       font-size: 14px;
-      filter: grayscale(100%) brightness(0.6);
+      filter: grayscale(100%) brightness(0.8);
     }
 
     #status.connected::before {
-      filter: hue-rotate(90deg) saturate(2) brightness(1.2);
+      filter: sepia(100%) saturate(500%) hue-rotate(60deg) brightness(0.9);
     }
 
     #status.error::before {
-      filter: hue-rotate(330deg) saturate(2) brightness(1.2);
+      filter: sepia(100%) saturate(500%) hue-rotate(-20deg) brightness(1.1);
     }
 
     /* Empty state */
