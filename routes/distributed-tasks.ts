@@ -631,3 +631,16 @@ export async function reassignTask(req: Request): Promise<any> {
     return { error: err.message, status: 400 };
   }
 }
+
+export async function clearHistory(): Promise<any> {
+  if (!tasks.isTasksNetworkEnabled()) {
+    return { error: "Distributed tasks not configured", status: 503 };
+  }
+
+  try {
+    const result = await tasks.clearHistory();
+    return result;
+  } catch (err: any) {
+    return { error: err.message, status: 400 };
+  }
+}

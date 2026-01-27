@@ -652,6 +652,14 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     })();
   }
 
+  // DELETE /api/distributed-tasks/history - Clear completed/failed tasks
+  if (req.method === "DELETE" && path === "/api/distributed-tasks/history") {
+    return (async () => {
+      const result = await distributedTasks.clearHistory();
+      return Response.json(result);
+    })();
+  }
+
   // PATCH /api/distributed-tasks/:id - Update a task
   if (req.method === "PATCH" && path.match(/^\/api\/distributed-tasks\/[^/]+$/)) {
     const id = path.split("/")[3];

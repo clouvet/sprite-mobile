@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { readFileSync, existsSync } from "fs";
 import { randomUUID } from "crypto";
 import { getHostname } from "./network";
@@ -418,4 +418,49 @@ export async function reassignTask(taskId: string, newAssignedTo: string): Promi
   await addTaskToQueue(newAssignedTo, taskId);
 
   console.log(`Reassigned task ${taskId} from ${oldAssignedTo} to ${newAssignedTo}`);
+}
+
+export async function clearHistory(): Promise<{ deletedCount: number }> {
+  if (!s3Client || !bucketName) {
+    throw new Error("Tasks network not initialized");
+  }
+
+  const allTasks = await listAllTasks();
+
+  let deletedCount = 0;
+  for (const task of allTasks) {
+    try {
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: `tasks/${task.id}.json`,
+      }));
+      deletedCount++;
+      console.log(`Deleted task ${task.id} (${task.status})`);
+    } catch (err) {
+      console.error(`Failed to delete task ${task.id}:`, err);
+    }
+  }
+
+  // Also clear all task queues
+  try {
+    const queueResponse = await s3Client.send(new ListObjectsV2Command({
+      Bucket: bucketName,
+      Prefix: "task-queues/",
+    }));
+
+    for (const obj of queueResponse.Contents || []) {
+      if (obj.Key?.endsWith(".json")) {
+        await s3Client.send(new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: obj.Key,
+        }));
+        console.log(`Deleted queue ${obj.Key}`);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to clear queues:", err);
+  }
+
+  console.log(`Cleared ${deletedCount} tasks from history`);
+  return { deletedCount };
 }
