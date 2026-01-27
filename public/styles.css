@@ -1463,6 +1463,16 @@
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .waking-spinner .spinner-sprite {
+      font-size: 20px;
+      animation: spin-clockwise 2s linear infinite;
+      position: absolute;
     }
 
     .waking-text {
@@ -1517,6 +1527,16 @@
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .switching-spinner .spinner-sprite {
+      font-size: 20px;
+      animation: spin-clockwise 2s linear infinite;
+      position: absolute;
     }
 
     .switching-text {
