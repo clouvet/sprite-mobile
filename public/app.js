@@ -452,7 +452,7 @@
 
     function renderSessionsList() {
       if (sessions.length === 0 && !sessionsLoaded) {
-        sessionsList.innerHTML = '<div class="loading">Loading chats...</div>';
+        sessionsList.innerHTML = '<div class="sessions-loading"><span class="sprite-emoji">👾</span></div>';
         return;
       }
 

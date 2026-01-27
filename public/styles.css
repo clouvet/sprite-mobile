@@ -171,6 +171,27 @@
       color: var(--text-muted);
     }
 
+    .sessions-loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 32px 16px;
+    }
+
+    .sessions-loading .sprite-emoji {
+      font-size: 32px;
+      animation: spin-clockwise 2s linear infinite;
+    }
+
+    @keyframes spin-clockwise {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     .session-delete {
       width: 36px;
       height: 36px;
