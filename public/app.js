@@ -1779,11 +1779,18 @@
         clearHistoryBtn.textContent = 'Clearing...';
         const res = await fetch('/api/distributed-tasks/history', { method: 'DELETE' });
         const data = await res.json();
+
+        if (data.error) {
+          console.error('Failed to clear history:', data.error);
+          alert(`Failed to clear history: ${data.error}`);
+          return;
+        }
+
         alert(`Cleared ${data.deletedCount} tasks from history`);
         loadTasks(); // Refresh the list
       } catch (err) {
         console.error('Failed to clear history:', err);
-        alert('Failed to clear history');
+        alert('Failed to clear history: ' + err.message);
       } finally {
         clearHistoryBtn.disabled = false;
         clearHistoryBtn.textContent = 'Clear History';
