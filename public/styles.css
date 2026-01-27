@@ -675,12 +675,14 @@
 
     #input-wrapper {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
       align-items: flex-end;
     }
 
     #input {
-      flex: 1;
+      flex: 1 1 100%;
+      order: -1;
       min-height: 44px;
       max-height: 120px;
       padding: 10px 14px;
@@ -712,6 +714,7 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      margin-left: auto;
       -webkit-tap-highlight-color: transparent;
       transition: opacity 0.2s ease, transform 0.2s ease;
     }
