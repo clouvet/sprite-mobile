@@ -1270,23 +1270,25 @@
     }
 
     .sprite-status {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
       flex-shrink: 0;
+      font-size: 14px;
+      line-height: 1;
     }
 
-    .sprite-status.online {
-      background: #22c55e;
-      box-shadow: 0 0 6px #22c55e;
+    .sprite-status::before {
+      content: "👾";
     }
 
-    .sprite-status.recent {
-      background: #eab308;
+    .sprite-status.online::before {
+      filter: sepia(100%) saturate(500%) hue-rotate(60deg) brightness(0.9);
     }
 
-    .sprite-status.offline {
-      background: #6b7280;
+    .sprite-status.recent::before {
+      filter: sepia(100%) saturate(500%) hue-rotate(10deg) brightness(1.1);
+    }
+
+    .sprite-status.offline::before {
+      filter: grayscale(100%) brightness(0.6);
     }
 
     .sprite-owner {
