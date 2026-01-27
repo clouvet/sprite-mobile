@@ -426,10 +426,9 @@ export async function clearHistory(): Promise<{ deletedCount: number }> {
   }
 
   const allTasks = await listAllTasks();
-  const completedOrFailed = allTasks.filter(t => t.status === "completed" || t.status === "failed");
 
   let deletedCount = 0;
-  for (const task of completedOrFailed) {
+  for (const task of allTasks) {
     try {
       await s3Client.send(new DeleteObjectCommand({
         Bucket: bucketName,
@@ -442,6 +441,26 @@ export async function clearHistory(): Promise<{ deletedCount: number }> {
     }
   }
 
-  console.log(`Cleared ${deletedCount} completed/failed tasks from history`);
+  // Also clear all task queues
+  try {
+    const queueResponse = await s3Client.send(new ListObjectsV2Command({
+      Bucket: bucketName,
+      Prefix: "task-queues/",
+    }));
+
+    for (const obj of queueResponse.Contents || []) {
+      if (obj.Key?.endsWith(".json")) {
+        await s3Client.send(new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: obj.Key,
+        }));
+        console.log(`Deleted queue ${obj.Key}`);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to clear queues:", err);
+  }
+
+  console.log(`Cleared ${deletedCount} tasks from history`);
   return { deletedCount };
 }
