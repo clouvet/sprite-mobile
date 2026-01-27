@@ -81,6 +81,7 @@
 
     // State
     let sessions = [];
+    let sessionsLoaded = false;
     let currentSession = null;
     let ws = null;
     let keepaliveWs = null;
@@ -417,6 +418,7 @@
     async function loadSessions() {
       const res = await fetch('/api/sessions');
       sessions = await res.json();
+      sessionsLoaded = true;
       renderSessionsList();
       return sessions;
     }
@@ -449,6 +451,11 @@
     }
 
     function renderSessionsList() {
+      if (sessions.length === 0 && !sessionsLoaded) {
+        sessionsList.innerHTML = '<div class="loading">Loading chats...</div>';
+        return;
+      }
+
       sessionsList.innerHTML = sessions.map(s => `
         <div class="session-item ${currentSession?.id === s.id ? 'active' : ''}" data-id="${s.id}">
           <div class="session-name">
@@ -1941,6 +1948,9 @@
 
     // Init - wake up sprite first, then load sessions
     async function init() {
+      // Show loading state in sidebar immediately
+      renderSessionsList();
+
       // Notify parent immediately that iframe is ready (for unauthorized detection)
       // This must happen before wakeUpSprite() which can take >8 seconds
       if (notifyParentReady) {
@@ -1973,14 +1983,16 @@
       // Start keepalive WebSocket now that sprite is awake
       connectKeepalive();
 
-      // Load sprites list and update current sprite's publicUrl
-      await loadSprites();
+      // Load sessions and sprites in parallel for faster startup
+      const [_, spritesLoaded] = await Promise.all([
+        loadSessions(),
+        loadSprites()
+      ]);
+
+      // Update current sprite's publicUrl
       if (spritePublicUrl) {
         await updateCurrentSpritePublicUrl(spritePublicUrl);
       }
-
-      // Now load sessions and restore state
-      await loadSessions();
 
       // Check URL hash for session ID (e.g., #session=abc123)
       const hashMatch = location.hash.match(/^#session=(.+)$/);
