@@ -333,13 +333,18 @@
       border: none;
       color: #ffffff;
       cursor: pointer;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       transition: all 0.15s;
       opacity: 1;
       margin-bottom: 3px;
+    }
+
+    /* Show stop button when input is focused */
+    #input-area.focused #stop-btn {
+      display: flex;
     }
 
     #stop-btn svg {
@@ -675,6 +680,7 @@
 
     #input-wrapper {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
       align-items: flex-end;
     }
@@ -696,6 +702,12 @@
       -webkit-appearance: none;
     }
 
+    /* When focused, input takes full width and forces wrap */
+    #input-area.focused #input {
+      flex: 1 1 100%;
+      order: -1;
+    }
+
     #input:focus { border-color: var(--accent); }
     #input::placeholder { color: var(--text-muted); }
 
@@ -712,10 +724,16 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      margin-left: auto;
       -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.2s ease, transform 0.2s ease;
     }
 
-    #send:disabled { opacity: 0.5; cursor: not-allowed; }
+    #send:disabled {
+      opacity: 0;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
     #send:active:not(:disabled) { transform: scale(0.95); }
 
     /* Attach button */
@@ -727,11 +745,15 @@
       border: 1px solid var(--border);
       color: var(--text-secondary);
       cursor: pointer;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.2s ease;
+    }
+    #input-area.focused #attach-btn {
+      display: flex;
     }
     #attach-btn:active {
       background: var(--bg-tertiary);
@@ -739,7 +761,7 @@
     }
     #attach-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Mic button */
+    /* Mic button - always visible */
     #mic-btn {
       width: 44px;
       height: 44px;

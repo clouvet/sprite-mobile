@@ -1089,6 +1089,11 @@
       imagePreview.classList.remove('has-image');
       imagePreviewImg.src = '';
       imagePreviewName.textContent = '';
+
+      // Remove focused class if input is also empty
+      if (!inputEl.value.trim()) {
+        inputArea.classList.remove('focused');
+      }
     }
 
     // Resize image if too large (max 2048px on longest side)
@@ -1164,6 +1169,9 @@
         imagePreviewImg.src = localUrl;
         imagePreviewName.textContent = file.name;
         imagePreview.classList.add('has-image');
+
+        // Keep input area focused when image is attached
+        inputArea.classList.add('focused');
       } catch (err) {
         console.error('Upload failed:', err);
         alert('Failed to upload image');
@@ -1265,6 +1273,19 @@
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         send();
+      }
+    });
+
+    // Slack-style collapsed/expanded input
+    inputEl.addEventListener('focus', () => {
+      inputArea.classList.add('focused');
+    });
+
+    inputEl.addEventListener('blur', () => {
+      // Only remove focused class if input is empty
+      // Keep it focused if there's text or an image
+      if (!inputEl.value.trim() && !pendingImage) {
+        inputArea.classList.remove('focused');
       }
     });
 
