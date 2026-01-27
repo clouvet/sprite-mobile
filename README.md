@@ -26,7 +26,6 @@ sprite-mobile gives you a progressive web app chat UI for accessing Claude Code 
   - [WebSocket](#websocket)
   - [Keepalive](#keepalive)
 - [Session Lifecycle](#session-lifecycle)
-- [CLI Session Attachment](#cli-session-attachment)
 - [Configuration](#configuration)
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
@@ -230,7 +229,6 @@ Claude will have full context about sprite-mobile without needing to read throug
 - **Multiple Chat Sessions**: Create and manage multiple independent chat sessions, each with its own Claude Code process
 - **Persistent History**: Messages are saved to disk and survive server restarts
 - **Session Resume**: Reconnecting to a session resumes the existing Claude conversation
-- **CLI Session Attachment**: Attach to existing Claude CLI sessions started in the terminal and import their history
 - **Image Support**: Upload and send images to Claude for analysis (auto-resized for API limits)
 - **Real-time Streaming**: Responses stream in real-time via WebSocket
 - **Activity Indicators**: See exactly what Claude is doing (reading files, running commands, searching)
@@ -628,7 +626,6 @@ Claude's `.jsonl` files are the source of truth. Sprite-mobile only maintains li
 | DELETE | `/api/sessions/:id` | Delete session |
 | GET | `/api/sessions/:id/messages` | Get message history |
 | POST | `/api/sessions/:id/regenerate-title` | Regenerate session title |
-| GET | `/api/claude-sessions` | Discover Claude CLI sessions from `~/.claude/projects/` |
 | POST | `/api/upload?session={id}` | Upload an image |
 | GET | `/api/uploads/:sessionId/:filename` | Retrieve uploaded image |
 | GET | `/api/sprites` | List saved Sprite profiles |
@@ -724,42 +721,6 @@ If you close your browser while Claude is working:
 - Keep browser tab open (even in background)
 - Open terminal session: `sprite exec -s <sprite-name>` keeps sprite awake
 - Use distributed tasks to assign work to another sprite
-
-## CLI Session Attachment
-
-Sprite Mobile can attach to existing Claude CLI sessions that were started in the terminal. This allows you to:
-
-1. Continue conversations that you started on the command line
-2. Import the full conversation history into the web interface
-3. Switch between CLI and web interface seamlessly
-
-**How it works:**
-
-- Click the terminal icon in the sidebar (next to "New Chat")
-- The app discovers sessions from `~/.claude/projects/` directory
-- Select a session to import its history and resume the conversation
-- The session continues with the same Claude session ID, maintaining full context
-
-**Session discovery format:**
-
-Claude CLI stores sessions in `~/.claude/projects/{cwd}/{sessionId}.jsonl`. The app:
-- Scans all working directories under the projects folder
-- Parses `.jsonl` files to extract message history
-- Shows the first user message as a preview
-- Filters out empty sessions and internal tool messages
-
-**Important caveat (with claude-hub):**
-
-claude-hub manages transitions between web and terminal sessions using a state machine:
-
-- **Web-only mode**: claude-hub runs a headless Claude process
-- **Terminal detected**: claude-hub kills the headless process and monitors the terminal session
-- **Terminal exits**: claude-hub spawns headless process again
-
-**Potential race condition:**
-- During the transition window (terminal detection → killing headless), both processes could theoretically write to the same `.jsonl` file
-- claude-hub detects terminal sessions via file watching (fsnotify), not continuous polling
-- **Best practice**: Avoid actively using both terminal and web interface simultaneously on the same session to prevent potential file corruption during state transitions
 
 ## Configuration
 

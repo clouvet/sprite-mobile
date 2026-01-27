@@ -13,9 +13,6 @@ import { backgroundProcesses, trySend } from "../lib/claude";
 import { discoverSprites, getSpriteStatus, getNetworkInfo, getHostname, updateHeartbeat, deleteSprite } from "../lib/network";
 import * as distributedTasks from "./distributed-tasks";
 
-// Claude projects directory
-const CLAUDE_PROJECTS_DIR = join(process.env.HOME || "/home/sprite", ".claude", "projects");
-
 // Detect actual image format from file content (magic bytes)
 function detectImageFormat(buffer: ArrayBuffer): { ext: string; mediaType: string } | null {
   const bytes = new Uint8Array(buffer);
@@ -48,154 +45,6 @@ function detectImageFormat(buffer: ArrayBuffer): { ext: string; mediaType: strin
   return null;
 }
 
-interface ClaudeCliSession {
-  sessionId: string;
-  cwd: string;
-  lastModified: number;
-  size: number;
-  preview?: string;
-}
-
-// Discover Claude CLI sessions from ~/.claude/projects/
-function discoverClaudeSessions(): ClaudeCliSession[] {
-  const sessions: ClaudeCliSession[] = [];
-
-  if (!existsSync(CLAUDE_PROJECTS_DIR)) {
-    return sessions;
-  }
-
-  try {
-    const cwdDirs = readdirSync(CLAUDE_PROJECTS_DIR);
-
-    for (const cwdDir of cwdDirs) {
-      const cwdPath = join(CLAUDE_PROJECTS_DIR, cwdDir);
-      const stat = statSync(cwdPath);
-
-      if (!stat.isDirectory()) continue;
-
-      // Convert directory name back to path (e.g., "-home-sprite" -> "/home/sprite")
-      const cwd = "/" + cwdDir.replace(/-/g, "/").replace(/^\/+/, "");
-
-      // Find .jsonl files (session histories)
-      const files = readdirSync(cwdPath);
-      for (const file of files) {
-        if (!file.endsWith(".jsonl")) continue;
-
-        const sessionId = basename(file, ".jsonl");
-        const filePath = join(cwdPath, file);
-        const fileStat = statSync(filePath);
-
-        // Skip empty files
-        if (fileStat.size === 0) continue;
-
-        // Try to get first user message as preview
-        let preview = "";
-        try {
-          const content = readFileSync(filePath, "utf-8");
-          const lines = content.split("\n").filter(l => l.trim());
-          for (const line of lines.slice(0, 20)) {
-            try {
-              const obj = JSON.parse(line);
-              if (obj.type === "user" && obj.message?.content) {
-                const text = typeof obj.message.content === "string"
-                  ? obj.message.content
-                  : obj.message.content.find((c: any) => c.type === "text")?.text || "";
-                if (text) {
-                  preview = text.slice(0, 100);
-                  break;
-                }
-              }
-            } catch {}
-          }
-        } catch {}
-
-        sessions.push({
-          sessionId,
-          cwd,
-          lastModified: fileStat.mtimeMs,
-          size: fileStat.size,
-          preview,
-        });
-      }
-    }
-  } catch (err) {
-    console.error("Error discovering Claude sessions:", err);
-  }
-
-  // Sort by last modified, most recent first
-  sessions.sort((a, b) => b.lastModified - a.lastModified);
-
-  return sessions;
-}
-
-// Parse CLI session .jsonl file and convert to sprite-mobile message format
-function parseCliSessionMessages(cwd: string, claudeSessionId: string): StoredMessage[] {
-  const messages: StoredMessage[] = [];
-
-  // Convert cwd to directory name format (e.g., "/home/sprite" -> "-home-sprite")
-  const cwdDir = cwd.replace(/\//g, "-");
-  const sessionFile = join(CLAUDE_PROJECTS_DIR, cwdDir, `${claudeSessionId}.jsonl`);
-
-  if (!existsSync(sessionFile)) {
-    console.log(`CLI session file not found: ${sessionFile}`);
-    return messages;
-  }
-
-  try {
-    const content = readFileSync(sessionFile, "utf-8");
-    const lines = content.split("\n").filter(l => l.trim());
-
-    for (const line of lines) {
-      try {
-        const obj = JSON.parse(line);
-
-        // Skip non-message types
-        if (obj.type !== "user" && obj.type !== "assistant") continue;
-
-        // Skip meta messages and tool results
-        if (obj.isMeta) continue;
-        if (obj.message?.content?.[0]?.type === "tool_result") continue;
-
-        const timestamp = obj.timestamp ? new Date(obj.timestamp).getTime() : Date.now();
-
-        if (obj.type === "user" && obj.message?.content) {
-          // User message - extract text content
-          let content = "";
-          if (typeof obj.message.content === "string") {
-            content = obj.message.content;
-          } else if (Array.isArray(obj.message.content)) {
-            // Find text content in array
-            const textBlock = obj.message.content.find((c: any) => c.type === "text");
-            if (textBlock) content = textBlock.text;
-          }
-
-          // Skip command messages and empty content
-          if (content && !content.startsWith("<command-name>") && !content.startsWith("<local-command")) {
-            messages.push({ role: "user", content, timestamp });
-          }
-        } else if (obj.type === "assistant" && obj.message?.content) {
-          // Assistant message - extract text blocks
-          let content = "";
-          if (Array.isArray(obj.message.content)) {
-            const textBlocks = obj.message.content
-              .filter((c: any) => c.type === "text")
-              .map((c: any) => c.text);
-            content = textBlocks.join("\n\n");
-          }
-
-          if (content) {
-            messages.push({ role: "assistant", content, timestamp });
-          }
-        }
-      } catch {}
-    }
-  } catch (err) {
-    console.error("Error parsing CLI session:", err);
-  }
-
-  return messages;
-}
-
 export function handleApi(req: Request, url: URL): Response | Promise<Response> | null {
   const path = url.pathname;
 
@@ -226,12 +75,6 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     return Response.json(messages);
   }
 
-  // GET /api/claude-sessions - Discover Claude CLI sessions
-  if (req.method === "GET" && path === "/api/claude-sessions") {
-    const cliSessions = discoverClaudeSessions();
-    return Response.json(cliSessions);
-  }
-
   // POST /api/sessions
   if (req.method === "POST" && path === "/api/sessions") {
     return (async () => {
@@ -244,21 +87,7 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
         cwd,
         createdAt: Date.now(),
         lastMessageAt: Date.now(),
-        // Support attaching to external Claude CLI sessions
-        claudeSessionId: body.claudeSessionId,
       };
-
-      // If attaching to a CLI session, import its message history
-      if (body.claudeSessionId) {
-        const cliMessages = parseCliSessionMessages(cwd, body.claudeSessionId);
-        if (cliMessages.length > 0) {
-          saveMessages(newSession.id, cliMessages);
-          // Update last message preview
-          const lastMsg = cliMessages[cliMessages.length - 1];
-          newSession.lastMessage = lastMsg.content.slice(0, 100);
-          newSession.lastMessageAt = lastMsg.timestamp;
-        }
-      }
 
       sessions.push(newSession);
       saveSessions(sessions);
@@ -289,11 +118,12 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
       // Find Claude session file by scanning all cwd directories
       // Claude's files are the source of truth - no need for sprite-mobile metadata
       let claudeSessionFile: string | null = null;
+      const claudeProjectsDir = join(process.env.HOME || "/home/sprite", ".claude", "projects");
 
-      if (existsSync(CLAUDE_PROJECTS_DIR)) {
-        const cwdDirs = readdirSync(CLAUDE_PROJECTS_DIR);
+      if (existsSync(claudeProjectsDir)) {
+        const cwdDirs = readdirSync(claudeProjectsDir);
         for (const cwdDir of cwdDirs) {
-          const candidateFile = join(CLAUDE_PROJECTS_DIR, cwdDir, `${id}.jsonl`);
+          const candidateFile = join(claudeProjectsDir, cwdDir, `${id}.jsonl`);
           if (existsSync(candidateFile)) {
             claudeSessionFile = candidateFile;
             break;

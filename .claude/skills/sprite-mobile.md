@@ -623,7 +623,6 @@ This regenerates the tailnet-gate server with the current Tailscale serve URL.
 | DELETE | `/api/sessions/:id` | Delete session |
 | GET | `/api/sessions/:id/messages` | Get message history |
 | POST | `/api/sessions/:id/regenerate-title` | Regenerate session title |
-| GET | `/api/claude-sessions` | Discover CLI sessions from `~/.claude/projects/` |
 | POST | `/api/upload?session={id}` | Upload an image |
 | GET | `/api/uploads/:sessionId/:filename` | Retrieve uploaded image |
 | GET | `/api/sprites` | List saved Sprite profiles |
