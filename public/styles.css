@@ -713,9 +713,14 @@
       justify-content: center;
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.2s ease, transform 0.2s ease;
     }
 
-    #send:disabled { opacity: 0.5; cursor: not-allowed; }
+    #send:disabled {
+      opacity: 0;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
     #send:active:not(:disabled) { transform: scale(0.95); }
 
     /* Attach button */
@@ -727,11 +732,15 @@
       border: 1px solid var(--border);
       color: var(--text-secondary);
       cursor: pointer;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.2s ease;
+    }
+    #input-area.focused #attach-btn {
+      display: flex;
     }
     #attach-btn:active {
       background: var(--bg-tertiary);
@@ -748,12 +757,15 @@
       border: 1px solid var(--border);
       color: var(--text-secondary);
       cursor: pointer;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
       transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    #input-area.focused #mic-btn {
+      display: flex;
     }
     #mic-btn:active {
       background: var(--bg-tertiary);
@@ -765,6 +777,7 @@
       border-color: #ef4444;
       color: #ef4444;
       animation: pulse-recording 1.5s ease-in-out infinite;
+      display: flex;
     }
     #mic-btn.unsupported { display: none; }
 
