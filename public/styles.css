@@ -128,6 +128,10 @@
       justify-content: center;
     }
 
+    #new-chat-btn:active {
+      transform: scale(0.95);
+    }
+
     #sessions-list {
       flex: 1;
       overflow-y: auto;
@@ -226,6 +230,7 @@
     .session-delete:active {
       background: #db5a7a;
       color: white;
+      transform: scale(0.95);
     }
 
     /* Overlay */
@@ -280,6 +285,10 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+    }
+
+    #menu-btn:active {
+      transform: scale(0.95);
     }
 
     header h1 {
@@ -406,6 +415,10 @@
       font-size: 16px;
       font-weight: 500;
       cursor: pointer;
+    }
+
+    #empty-state button:active {
+      transform: scale(0.95);
     }
 
     /* Messages area */
@@ -720,7 +733,10 @@
       flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
     }
-    #attach-btn:active { background: var(--bg-tertiary); }
+    #attach-btn:active {
+      background: var(--bg-tertiary);
+      transform: scale(0.95);
+    }
     #attach-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Mic button */
@@ -739,7 +755,10 @@
       -webkit-tap-highlight-color: transparent;
       transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
-    #mic-btn:active { background: var(--bg-tertiary); }
+    #mic-btn:active {
+      background: var(--bg-tertiary);
+      transform: scale(0.95);
+    }
     #mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     #mic-btn.recording {
       background: rgba(239, 68, 68, 0.2);
@@ -798,7 +817,10 @@
       font-size: 16px;
       line-height: 1;
     }
-    #remove-image:active { background: var(--border); }
+    #remove-image:active {
+      background: var(--border);
+      transform: scale(0.95);
+    }
 
     /* Settings button */
     #settings-btn {
@@ -816,6 +838,10 @@
       flex-shrink: 0;
     }
 
+    #settings-btn:active {
+      transform: scale(0.95);
+    }
+
     /* Tasks button */
     #tasks-btn {
       width: 36px;
@@ -830,6 +856,10 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+    }
+
+    #tasks-btn:active {
+      transform: scale(0.95);
     }
 
     /* Tasks Modal */
@@ -947,6 +977,10 @@
       color: white;
     }
 
+    .task-action-btn.cancel-btn:active {
+      transform: scale(0.95);
+    }
+
     .task-action-btn.reassign-btn {
       background: var(--bg-tertiary);
       color: #4a9eff;
@@ -956,6 +990,10 @@
     .task-action-btn.reassign-btn:hover {
       background: #4a9eff;
       color: white;
+    }
+
+    .task-action-btn.reassign-btn:active {
+      transform: scale(0.95);
     }
 
     .sprite-status-item {
@@ -989,6 +1027,10 @@
 
     .refresh-btn:hover {
       background: var(--bg-tertiary);
+    }
+
+    .refresh-btn:active {
+      transform: scale(0.95);
     }
 
     /* Sprites Modal */
@@ -1050,6 +1092,10 @@
       color: var(--text);
     }
 
+    .clear-history-btn:active {
+      transform: scale(0.95);
+    }
+
     .modal-close {
       width: 32px;
       height: 32px;
@@ -1062,6 +1108,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .modal-close:active {
+      transform: scale(0.95);
     }
 
     .modal-body {
@@ -1131,6 +1181,7 @@
     .sprite-delete:active {
       background: #db5a7a;
       color: white;
+      transform: scale(0.95);
     }
 
     .sprite-current-badge {
@@ -1182,6 +1233,10 @@
       cursor: not-allowed;
     }
 
+    .add-sprite-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
     .sprites-empty {
       text-align: center;
       color: var(--text-muted);
@@ -1227,6 +1282,7 @@
     .refresh-btn:active {
       background: var(--bg-tertiary);
       color: var(--text);
+      transform: scale(0.95);
     }
 
     .sprites-separator {
