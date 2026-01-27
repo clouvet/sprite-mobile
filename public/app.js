@@ -1302,14 +1302,6 @@
     newChatBtn.addEventListener('click', () => createSession());
     startChatBtn.addEventListener('click', () => createSession());
 
-    // Prevent action buttons from causing input blur
-    // Use mousedown/touchstart preventDefault to keep input focused
-    [attachBtn, micBtn].forEach(btn => {
-      btn.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // Prevent focus shift from input
-      });
-    });
-
     // Image upload handlers
     attachBtn.addEventListener('click', () => {
       isOpeningFilePicker = true;
@@ -2008,6 +2000,14 @@
       // Hide mic button if not supported
       micBtn.classList.add('unsupported');
     }
+
+    // Prevent action buttons from causing input blur
+    // Use mousedown preventDefault to keep input focused
+    [attachBtn, micBtn].forEach(btn => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Prevent focus shift from input
+      });
+    });
 
     // Init - wake up sprite first, then load sessions
     async function init() {
