@@ -927,7 +927,7 @@
       const indicator = document.createElement('div');
       indicator.className = 'activity-indicator';
       indicator.innerHTML = `
-        <div class="activity-spinner"></div>
+        <div class="activity-spinner"><span class="spinner-sprite">👾</span></div>
         <div class="activity-content">
           <div class="activity-action">${escapeHtml(action)}...</div>
           ${detail ? `<div class="activity-detail">${escapeHtml(truncatePath(detail))}</div>` : ''}

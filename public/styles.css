@@ -545,6 +545,16 @@
       border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 1s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .tool-indicator .spinner .spinner-sprite {
+      font-size: 7px;
+      animation: spin-clockwise 2s linear infinite;
+      position: absolute;
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -569,6 +579,16 @@
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .activity-spinner .spinner-sprite {
+      font-size: 8px;
+      animation: spin-clockwise 2s linear infinite;
+      position: absolute;
     }
 
     .activity-content {
@@ -1423,6 +1443,15 @@
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       display: none;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    #pull-indicator .pull-spinner .spinner-sprite {
+      font-size: 10px;
+      animation: spin-clockwise 2s linear infinite;
+      position: absolute;
     }
 
     #pull-indicator.refreshing .pull-arrow {
@@ -1430,7 +1459,7 @@
     }
 
     #pull-indicator.refreshing .pull-spinner {
-      display: block;
+      display: flex;
     }
 
     /* Waking overlay - shown while sprite is waking up */
