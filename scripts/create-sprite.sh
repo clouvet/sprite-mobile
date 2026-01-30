@@ -86,7 +86,7 @@ echo ""
 
 # Step 4: Download setup script
 echo "Step 4: Downloading setup script..."
-sprite -s "$SPRITE_NAME" -o "$ORG" exec -- bash -c "curl -fsSL https://gist.githubusercontent.com/clouvet/901dabc09e62648fa394af65ad004d04/raw/sprite-setup.sh -o ~/sprite-setup.sh && chmod +x ~/sprite-setup.sh"
+sprite -s "$SPRITE_NAME" -o "$ORG" exec -- bash -c "curl -fsSL https://raw.githubusercontent.com/clouvet/sprite-mobile/refs/heads/main/scripts/sprite-setup.sh -o ~/sprite-setup.sh && chmod +x ~/sprite-setup.sh"
 echo "  Downloaded sprite-setup.sh"
 echo ""
 
