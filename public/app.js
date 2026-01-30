@@ -2003,7 +2003,7 @@
 
     // Prevent action buttons from causing input blur
     // Use mousedown preventDefault to keep input focused
-    [attachBtn, micBtn].forEach(btn => {
+    [attachBtn, micBtn, sendBtn, stopBtn].forEach(btn => {
       btn.addEventListener('mousedown', (e) => {
         e.preventDefault(); // Prevent focus shift from input
       });
