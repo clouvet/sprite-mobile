@@ -661,7 +661,7 @@
 
         case 'history':
           // Render stored message history - clear first to avoid duplicates
-          console.log('[Client] Received history:', msg.messages?.length, 'messages');
+          console.log('[Client] Received history:', msg.messages?.length, 'messages', 'isGenerating:', msg.isGenerating);
           if (msg.messages && Array.isArray(msg.messages)) {
             messagesEl.innerHTML = '';
             currentAssistantMessage = null;
@@ -676,6 +676,13 @@
               }
             }
             console.log('[Client] Rendered', msg.messages.length, 'messages from history');
+
+            // If Claude is currently generating, show the thinking indicator
+            // and prepare to receive streaming content
+            if (msg.isGenerating) {
+              console.log('[Client] Claude is generating, preparing for streaming updates');
+              showThinkingIndicator();
+            }
           }
           break;
 
