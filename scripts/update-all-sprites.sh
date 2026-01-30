@@ -1,9 +1,11 @@
 #!/bin/bash
 # Update and restart sprite-mobile on all other sprite-mobile sprites
 # This script:
-# 1. Pulls latest code from git
-# 2. Restarts sprite-mobile service (re-registers with new path if needed)
-# 3. Regenerates and restarts tailnet-gate service
+# 1. Pulls latest code from git for sprite-mobile
+# 2. Pulls latest code and rebuilds claude-hub
+# 3. Restarts sprite-mobile service (re-registers with new path if needed)
+# 4. Restarts claude-hub service
+# 5. Regenerates and restarts tailnet-gate service
 
 set -e
 
@@ -56,13 +58,48 @@ for sprite_name in $SPRITES; do
 
     echo 'Code updated successfully'
   " 2>&1; then
-    echo "  ✓ Code pulled"
+    echo "  ✓ sprite-mobile code pulled"
   else
     echo "  ✗ Failed to pull code (sprite may not have sprite-mobile)"
     FAIL_COUNT=$((FAIL_COUNT + 1))
     FAILED_SPRITES="$FAILED_SPRITES $sprite_name"
     echo ""
     continue
+  fi
+
+  # Update claude-hub
+  echo "  Updating claude-hub..."
+  if sprite -s "$sprite_name" exec -- bash -c "
+    set -a && source ~/.sprite-config && set +a
+    cd ~/.claude-hub 2>/dev/null || exit 1
+
+    # Pull latest code with auth if needed
+    git remote set-url origin https://\$GH_TOKEN@github.com/clouvet/claude-hub.git 2>/dev/null || true
+    git pull
+    git remote set-url origin https://github.com/clouvet/claude-hub.git 2>/dev/null || true
+
+    # Rebuild
+    go build -o bin/claude-hub main.go
+
+    echo 'claude-hub updated and rebuilt'
+  " 2>&1; then
+    echo "  ✓ claude-hub code pulled and rebuilt"
+  else
+    echo "  ✗ Failed to update claude-hub (may not be installed)"
+    # Don't fail the whole update if claude-hub isn't there
+  fi
+
+  # Restart claude-hub service
+  echo "  Restarting claude-hub service..."
+  if sprite -s "$sprite_name" exec -- bash -c "
+    set -a && source ~/.sprite-config && set +a
+    cd ~/.sprite-mobile
+    ./scripts/sprite-setup.sh 12
+  " >/dev/null 2>&1; then
+    echo "  ✓ claude-hub service restarted"
+  else
+    echo "  ✗ Failed to restart claude-hub (may not be installed)"
+    # Don't fail the whole update if claude-hub isn't there
   fi
 
   # Re-register and restart sprite-mobile service
@@ -72,7 +109,7 @@ for sprite_name in $SPRITES; do
     cd ~/.sprite-mobile
     ./scripts/sprite-setup.sh 8
   " >/dev/null 2>&1; then
-    echo "  ✓ Service restarted"
+    echo "  ✓ sprite-mobile service restarted"
   else
     echo "  ✗ Failed to restart service"
     FAIL_COUNT=$((FAIL_COUNT + 1))
