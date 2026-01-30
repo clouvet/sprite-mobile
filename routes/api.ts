@@ -12,6 +12,21 @@ import type { StoredMessage } from "../lib/types";
 import { backgroundProcesses, trySend } from "../lib/claude";
 import { discoverSprites, getSpriteStatus, getNetworkInfo, getHostname, updateHeartbeat, deleteSprite } from "../lib/network";
 import * as distributedTasks from "./distributed-tasks";
+import { allClients } from "./websocket";
+
+// Broadcast a message to all connected keepalive clients
+function broadcastToAll(message: any) {
+  const data = JSON.stringify(message);
+  for (const client of allClients) {
+    if (client.readyState === 1) {
+      try {
+        client.send(data);
+      } catch (err) {
+        // Client may have disconnected, ignore
+      }
+    }
+  }
+}
 
 // Detect actual image format from file content (magic bytes)
 function detectImageFormat(buffer: ArrayBuffer): { ext: string; mediaType: string } | null {
@@ -91,6 +106,10 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
 
       sessions.push(newSession);
       saveSessions(sessions);
+
+      // Broadcast to all clients to refresh their session lists
+      broadcastToAll({ type: "refresh_sessions" });
+
       return Response.json(newSession);
     })();
   }
@@ -322,6 +341,10 @@ export function handleApi(req: Request, url: URL): Response | Promise<Response> 
     sessions = sessions.filter(s => s.id !== id);
     saveSessions(sessions);
     deleteMessagesFile(id);
+
+    // Broadcast to all clients to refresh their session lists
+    broadcastToAll({ type: "refresh_sessions" });
+
     return new Response(null, { status: 204 });
   }
 
